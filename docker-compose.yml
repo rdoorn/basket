@@ -1,0 +1,31 @@
+services:
+  mongo:
+    image: mongo:7.0
+    command: ["--port", "47017"]
+    ports:
+      - "47017:47017"
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build: ./backend
+    environment:
+      MONGO_URL: "mongodb://mongo:47017"
+      MONGO_DB: "basket"
+      API_PORT: "18420"
+    ports:
+      - "18420:18420"
+    depends_on:
+      - mongo
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE: "http://localhost:18420"
+    ports:
+      - "8173:8173"
+    depends_on:
+      - api
+
+volumes:
+  mongo_data:

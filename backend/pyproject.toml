@@ -1,0 +1,27 @@
+[project]
+name = "basket-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "motor==3.6.0",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.0",
+    "mongomock-motor==0.0.34",
+    "flake8==7.1.1",
+    "httpx==0.28.1",
+]
+
+[tool.uv]
+exclude-newer = "2026-08-14T00:00:00Z"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,37 @@
+"""Motor-based week-menu repository adapter.
+
+The whole menu is a single document under ``_id="current"``. ``load`` returns
+an empty :class:`WeekMenu` when the document is absent; ``save`` upserts it.
+"""
+from typing import Any
+
+from app.domain.menu import WeekMenu
+from app.ports.menu_repo import MenuRepo
+
+_COLLECTION = "weekmenu"
+_DOC_ID = "current"
+
+
+class MongoMenuRepo(MenuRepo):
+    """Store the current week menu as a single MongoDB document."""
+
+    def __init__(self, db: Any) -> None:
+        """Create a repository backed by ``db``'s ``weekmenu`` collection."""
+        self._collection = db[_COLLECTION]
+
+    async def load(self) -> WeekMenu:
+        """Return the stored menu, or an empty :class:`WeekMenu` when absent."""
+        doc = await self._collection.find_one({"_id": _DOC_ID})
+        if not doc:
+            return WeekMenu()
+        assignments = doc.get("assignments", {})
+        return WeekMenu.model_validate({"assignments": assignments})
+
+    async def save(self, menu: WeekMenu) -> None:
+        """Upsert ``menu`` as the single ``current`` document."""
+        payload: dict[str, Any] = {"assignments": menu.model_dump()["assignments"]}
+        await self._collection.replace_one(
+            {"_id": _DOC_ID},
+            {"_id": _DOC_ID, **payload},
+            upsert=True,
+        )
