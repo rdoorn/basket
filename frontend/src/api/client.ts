@@ -84,10 +84,14 @@ export interface ShoppingItem {
   quantity: number | null
   unit: string | null
   source: string
+  staple: boolean
 }
 
 export interface ShoppingListResponse {
+  // Lines to order (non-staples plus promoted staples).
   items: ShoppingItem[]
+  // "Heb ik vast wel" staples the user probably has on hand.
+  pantry: ShoppingItem[]
 }
 
 export interface PricedItem {
@@ -186,6 +190,14 @@ export function getShoppingList(): Promise<ShoppingListResponse> {
   return request<ShoppingListResponse>('/shopping-list')
 }
 
+// Promote (buy=true) or un-promote a "heb ik vast wel" staple.
+export function setStaple(name: string, buy: boolean): Promise<ShoppingListResponse> {
+  return request<ShoppingListResponse>('/shopping-list/staple', {
+    method: 'PUT',
+    body: JSON.stringify({ name, buy }),
+  })
+}
+
 export function quotePricing(): Promise<QuoteResponse> {
   return request<QuoteResponse>('/pricing/quote', { method: 'POST', body: '{}' })
 }
@@ -200,6 +212,7 @@ export const api = {
   putAssignment,
   deleteAssignment,
   getShoppingList,
+  setStaple,
   quotePricing,
 }
 

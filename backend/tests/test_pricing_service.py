@@ -39,14 +39,16 @@ def test_line_total_uses_quantity_and_none_defaults_to_one():
     assert item.line_total == item.unit_price  # quantity None -> factor 1
 
 
-def test_external_source_items_excluded_from_quotes():
+def test_quote_all_prices_every_item_given():
+    # The caller passes the to-buy list (pantry staples already removed), so the
+    # service prices exactly what it receives.
     items = [
-        ShoppingListItem(name="macaroni", quantity=350, unit="g", source="supermarket"),
-        ShoppingListItem(name="gehakt", quantity=300, unit="g", source="external"),
+        ShoppingListItem(name="macaroni", quantity=350, unit="g"),
+        ShoppingListItem(name="passata", quantity=200, unit="g"),
     ]
     quotes = quote_all(items, [MockPricingProvider("Albert Heijn")])
     names = {i.name for i in quotes[0].items}
-    assert names == {"macaroni"}
+    assert names == {"macaroni", "passata"}
 
 
 def test_quote_all_empty_providers_returns_empty():

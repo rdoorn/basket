@@ -5,6 +5,7 @@ import { useMenuStore } from '../stores/menu'
 import RecipeCard from '../components/RecipeCard.vue'
 import DayCell from '../components/DayCell.vue'
 import ShoppingList from '../components/ShoppingList.vue'
+import PantryList from '../components/PantryList.vue'
 
 const store = useMenuStore()
 const router = useRouter()
@@ -55,6 +56,14 @@ function onSave(): void {
   store.markSaved()
   showToast('Weekmenu opgeslagen ✓')
 }
+
+function onPromote(name: string): void {
+  store.setStaple(name, true).catch((err) => showToast(`Toevoegen mislukt: ${String(err)}`))
+}
+
+function onUnpromote(name: string): void {
+  store.setStaple(name, false).catch((err) => showToast(`Terugzetten mislukt: ${String(err)}`))
+}
 </script>
 
 <template>
@@ -93,7 +102,10 @@ function onSave(): void {
         />
       </section>
 
-      <ShoppingList :items="store.shoppingList" />
+      <div class="side">
+        <ShoppingList :items="store.shoppingList" @unpromote="onUnpromote" />
+        <PantryList :items="store.pantry" @promote="onPromote" />
+      </div>
     </div>
 
     <transition name="fade">

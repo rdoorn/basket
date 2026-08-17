@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PortionSelector from './PortionSelector.vue'
+import { FROMDATE_MIME, RECIPE_MIME, dropEffectForTypes } from '../lib/dnd'
 import type { Assignment, RecipeCard } from '../api/client'
 
 const props = defineProps<{
@@ -32,7 +33,7 @@ function onDragStart(event: DragEvent): void {
     return
   }
   // A cell drag carries its source date (a move/swap).
-  event.dataTransfer.setData('application/x-basket-fromdate', props.date)
+  event.dataTransfer.setData(FROMDATE_MIME, props.date)
   event.dataTransfer.effectAllowed = 'move'
 }
 
@@ -40,7 +41,9 @@ function onDragOver(event: DragEvent): void {
   event.preventDefault()
   dragOver.value = true
   if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'move'
+    // Must match the source's effectAllowed (copy for a library recipe, move
+    // for a cell drag) or the browser silently refuses the drop.
+    event.dataTransfer.dropEffect = dropEffectForTypes(event.dataTransfer.types)
   }
 }
 
@@ -55,12 +58,12 @@ function onDrop(event: DragEvent): void {
   if (!dt) {
     return
   }
-  const fromDate = dt.getData('application/x-basket-fromdate')
+  const fromDate = dt.getData(FROMDATE_MIME)
   if (fromDate) {
     emit('move', { fromDate, toDate: props.date })
     return
   }
-  const recipeId = dt.getData('application/x-basket-recipe')
+  const recipeId = dt.getData(RECIPE_MIME)
   if (recipeId) {
     emit('assign', { date: props.date, recipeId })
   }

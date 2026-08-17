@@ -31,7 +31,6 @@ def build_seed_recipe() -> Recipe:
             quantity=300,
             unit="g",
             note="zonder zout van de boerderij",
-            source="external",
         ),
         Ingredient(
             group="Basis", name="ui", quantity=1, unit="stuk", note="groot, fijngesneden"

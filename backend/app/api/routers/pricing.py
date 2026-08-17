@@ -25,6 +25,6 @@ async def quote(
     menu = await menu_repo.load()
     recipes = await recipe_repo.list()
     recipes_by_id = {recipe.id: recipe for recipe in recipes}
-    items = shopping_service.build_shopping_list(menu, recipes_by_id)
-    quotes = pricing_service.quote_all(items, providers)
+    breakdown = shopping_service.build_breakdown(menu, recipes_by_id)
+    quotes = pricing_service.quote_all(breakdown.items, providers)
     return PricingOut.from_quotes(quotes)

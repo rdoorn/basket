@@ -126,6 +126,17 @@ async def test_menu_save_and_load_round_trip():
 
 
 @pytest.mark.asyncio
+async def test_menu_round_trips_promoted_staples():
+    repo = MongoMenuRepo(_db())
+    menu = WeekMenu()
+    menu.set("2026-08-17", DayAssignment(recipe_id="r1", multiplier=1.0))
+    menu.set_staple_buy("gehakt", True)
+    await repo.save(menu)
+    loaded = await repo.load()
+    assert loaded.promoted_staples == ["gehakt"]
+
+
+@pytest.mark.asyncio
 async def test_menu_save_upserts_single_document():
     db = _db()
     repo = MongoMenuRepo(db)

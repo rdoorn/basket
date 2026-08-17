@@ -1,7 +1,12 @@
 """Unit tests for the shopping-list aggregation/scaling service."""
 from app.domain.recipe import Recipe, Ingredient
 from app.domain.menu import WeekMenu, DayAssignment
-from app.services.shopping_service import build_shopping_list
+from app.domain.shopping import ShoppingListItem
+from app.services.shopping_service import (
+    build_breakdown,
+    build_shopping_list,
+    partition_staples,
+)
 
 
 def _recipe():
@@ -118,3 +123,55 @@ def test_missing_recipe_id_is_skipped():
     menu.set("d1", DayAssignment(recipe_id="ghost", multiplier=1.0))
     items = build_shopping_list(menu, {})
     assert items == []
+
+
+def _shopping_items() -> list[ShoppingListItem]:
+    return [
+        ShoppingListItem(name="macaroni", quantity=350, unit="g"),
+        ShoppingListItem(name="gehakt", quantity=300, unit="g"),
+        ShoppingListItem(name="olijfolie", quantity=2, unit="el"),
+        ShoppingListItem(name="citroensap", quantity=0.5, unit="citroen"),
+    ]
+
+
+def test_partition_staples_splits_pantry_and_flags_them():
+    breakdown = partition_staples(_shopping_items(), promoted_staples=[])
+    buy = {i.name for i in breakdown.items}
+    pantry = {i.name for i in breakdown.pantry}
+    assert buy == {"macaroni"}
+    assert pantry == {"gehakt", "olijfolie", "citroensap"}
+    assert all(i.staple for i in breakdown.pantry)
+
+
+def test_partition_promotes_named_staple_into_items():
+    breakdown = partition_staples(_shopping_items(), promoted_staples=["gehakt"])
+    buy = {i.name for i in breakdown.items}
+    pantry = {i.name for i in breakdown.pantry}
+    assert "gehakt" in buy
+    assert "gehakt" not in pantry
+    promoted = next(i for i in breakdown.items if i.name == "gehakt")
+    assert promoted.staple is True
+
+
+def test_partition_matches_staples_case_insensitively():
+    items = [ShoppingListItem(name="Zwarte Peper", quantity=None, unit=None)]
+    breakdown = partition_staples(items, promoted_staples=[])
+    assert [i.name for i in breakdown.pantry] == ["Zwarte Peper"]
+
+
+def test_build_breakdown_uses_menu_promoted_staples():
+    recipe = Recipe(
+        id="S", title="t", icon="🍝", description="", servings=4,
+        total_time_min_low=None, total_time_min_high=None, tags=[], notes=None,
+        ingredients=[
+            Ingredient(name="macaroni", quantity=350, unit="g"),
+            Ingredient(name="gehakt", quantity=300, unit="g"),
+        ],
+        steps=[],
+    )
+    menu = WeekMenu()
+    menu.set("d1", DayAssignment(recipe_id="S", multiplier=1.0))
+    menu.set_staple_buy("gehakt", True)
+    breakdown = build_breakdown(menu, {"S": recipe})
+    assert {i.name for i in breakdown.items} == {"macaroni", "gehakt"}
+    assert breakdown.pantry == []

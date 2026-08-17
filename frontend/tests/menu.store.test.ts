@@ -13,6 +13,7 @@ vi.mock('../src/api/client', async (importOriginal) => {
     getShoppingList: vi.fn(),
     putAssignment: vi.fn(),
     deleteAssignment: vi.fn(),
+    setStaple: vi.fn(),
   }
 })
 
@@ -22,6 +23,7 @@ const mocked = client as unknown as {
   getShoppingList: ReturnType<typeof vi.fn>
   putAssignment: ReturnType<typeof vi.fn>
   deleteAssignment: ReturnType<typeof vi.fn>
+  setStaple: ReturnType<typeof vi.fn>
 }
 
 describe('menu store — optimistic move/swap/multiplier', () => {
@@ -31,7 +33,7 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     // API calls resolve but never drive state in these tests (optimistic-first).
     mocked.putAssignment.mockResolvedValue({ assignments: {} })
     mocked.deleteAssignment.mockResolvedValue({ assignments: {} })
-    mocked.getShoppingList.mockResolvedValue({ items: [] })
+    mocked.getShoppingList.mockResolvedValue({ items: [], pantry: [] })
   })
 
   it('assign() sets an assignment on a day', async () => {
@@ -116,14 +118,30 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     expect(mocked.deleteAssignment).toHaveBeenCalledWith('d1')
   })
 
-  it('refreshShoppingList() populates the shopping list from the API', async () => {
+  it('refreshShoppingList() populates the shopping list and pantry from the API', async () => {
     mocked.getShoppingList.mockResolvedValue({
-      items: [{ name: 'macaroni', quantity: 700, unit: 'g', source: 'supermarket' }],
+      items: [{ name: 'macaroni', quantity: 700, unit: 'g', source: 'supermarket', staple: false }],
+      pantry: [{ name: 'gehakt', quantity: 300, unit: 'g', source: 'supermarket', staple: true }],
     })
     const store = useMenuStore()
     await store.refreshShoppingList()
     expect(store.shoppingList).toHaveLength(1)
     expect(store.shoppingList[0].name).toBe('macaroni')
+    expect(store.pantry).toHaveLength(1)
+    expect(store.pantry[0].name).toBe('gehakt')
+  })
+
+  it('setStaple() promotes a staple and updates items + pantry from the API', async () => {
+    mocked.setStaple.mockResolvedValue({
+      items: [{ name: 'gehakt', quantity: 300, unit: 'g', source: 'supermarket', staple: true }],
+      pantry: [],
+    })
+    const store = useMenuStore()
+    store.pantry = [{ name: 'gehakt', quantity: 300, unit: 'g', source: 'supermarket', staple: true }]
+    await store.setStaple('gehakt', true)
+    expect(mocked.setStaple).toHaveBeenCalledWith('gehakt', true)
+    expect(store.shoppingList.map((i) => i.name)).toContain('gehakt')
+    expect(store.pantry).toHaveLength(0)
   })
 
   it('loadAll() fills recipes, assignments and shopping list', async () => {

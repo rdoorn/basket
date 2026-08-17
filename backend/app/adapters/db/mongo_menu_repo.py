@@ -24,12 +24,20 @@ class MongoMenuRepo(MenuRepo):
         doc = await self._collection.find_one({"_id": _DOC_ID})
         if not doc:
             return WeekMenu()
-        assignments = doc.get("assignments", {})
-        return WeekMenu.model_validate({"assignments": assignments})
+        return WeekMenu.model_validate(
+            {
+                "assignments": doc.get("assignments", {}),
+                "promoted_staples": doc.get("promoted_staples", []),
+            }
+        )
 
     async def save(self, menu: WeekMenu) -> None:
         """Upsert ``menu`` as the single ``current`` document."""
-        payload: dict[str, Any] = {"assignments": menu.model_dump()["assignments"]}
+        dump = menu.model_dump()
+        payload: dict[str, Any] = {
+            "assignments": dump["assignments"],
+            "promoted_staples": dump["promoted_staples"],
+        }
         await self._collection.replace_one(
             {"_id": _DOC_ID},
             {"_id": _DOC_ID, **payload},

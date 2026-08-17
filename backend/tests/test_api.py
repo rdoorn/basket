@@ -203,6 +203,59 @@ async def test_pricing_quote_two_stores_with_totals(client):
     assert stores == {"Albert Heijn", "Picnic"}
     for q in quotes:
         assert q["total"] == pytest.approx(sum(i["line_total"] for i in q["items"]))
-    # external-source gehakt is excluded from store pricing
+    # gehakt is a "heb ik vast wel" staple, so it is not priced until promoted
     for q in quotes:
         assert all(i["name"] != "gehakt" for i in q["items"])
+
+
+@pytest.mark.asyncio
+async def test_shopping_list_splits_staples_into_pantry(client):
+    rid = "macaroni-alla-siciliana"
+    await client.put(
+        "/weekmenu/assignments",
+        json={"date": _today(), "recipeId": rid, "multiplier": 1.0},
+    )
+    resp = await client.get("/shopping-list")
+    assert resp.status_code == 200
+    body = resp.json()
+    items = {i["name"] for i in body["items"]}
+    pantry = {i["name"] for i in body["pantry"]}
+    # staples land in the pantry, everything else in the shopping list
+    assert {"gehakt", "olijfolie", "citroensap", "zout", "zwarte peper"} <= pantry
+    assert "macaroni" in items
+    assert "citroenrasp" in items  # only citroensap is a staple, not the rasp
+    assert items.isdisjoint(pantry)
+
+
+@pytest.mark.asyncio
+async def test_promote_and_unpromote_staple(client):
+    rid = "macaroni-alla-siciliana"
+    await client.put(
+        "/weekmenu/assignments",
+        json={"date": _today(), "recipeId": rid, "multiplier": 1.0},
+    )
+    # Promote gehakt into the shopping list.
+    promoted = await client.put(
+        "/shopping-list/staple", json={"name": "gehakt", "buy": True}
+    )
+    assert promoted.status_code == 200
+    body = promoted.json()
+    gehakt = next(i for i in body["items"] if i["name"] == "gehakt")
+    assert gehakt["staple"] is True
+    assert all(i["name"] != "gehakt" for i in body["pantry"])
+
+    # It now counts toward pricing.
+    quotes = (await client.post("/pricing/quote")).json()["quotes"]
+    assert any(
+        any(i["name"] == "gehakt" for i in q["items"]) for q in quotes
+    )
+
+    # Persisted across a fresh GET, and reversible.
+    after_get = (await client.get("/shopping-list")).json()
+    assert any(i["name"] == "gehakt" for i in after_get["items"])
+    reverted = await client.put(
+        "/shopping-list/staple", json={"name": "gehakt", "buy": False}
+    )
+    body2 = reverted.json()
+    assert any(i["name"] == "gehakt" for i in body2["pantry"])
+    assert all(i["name"] != "gehakt" for i in body2["items"])

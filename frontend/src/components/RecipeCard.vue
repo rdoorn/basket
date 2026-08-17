@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { RECIPE_MIME } from '../lib/dnd'
 import type { RecipeCard } from '../api/client'
 
 const props = defineProps<{ recipe: RecipeCard }>()
@@ -10,7 +11,7 @@ function onDragStart(event: DragEvent): void {
     return
   }
   // A card drag carries only the recipe id (a new assignment).
-  event.dataTransfer.setData('application/x-basket-recipe', props.recipe.id)
+  event.dataTransfer.setData(RECIPE_MIME, props.recipe.id)
   event.dataTransfer.effectAllowed = 'copy'
 }
 

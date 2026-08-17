@@ -5,6 +5,7 @@ import {
   getShoppingList,
   putAssignment,
   deleteAssignment,
+  setStaple,
   type Assignment,
   type RecipeCard,
   type ShoppingItem,
@@ -18,6 +19,8 @@ interface MenuState {
   days: string[]
   recipes: RecipeCard[]
   shoppingList: ShoppingItem[]
+  // "Heb ik vast wel" staples not yet promoted into the shopping list.
+  pantry: ShoppingItem[]
   loading: boolean
   lastSavedAt: string | null
 }
@@ -28,6 +31,7 @@ export const useMenuStore = defineStore('menu', {
     days: [],
     recipes: [],
     shoppingList: [],
+    pantry: [],
     loading: false,
     lastSavedAt: null,
   }),
@@ -125,6 +129,14 @@ export const useMenuStore = defineStore('menu', {
     async refreshShoppingList(): Promise<void> {
       const res = await getShoppingList()
       this.shoppingList = res.items
+      this.pantry = res.pantry ?? []
+    },
+
+    // Promote (buy=true) or un-promote a "heb ik vast wel" staple.
+    async setStaple(name: string, buy: boolean): Promise<void> {
+      const res = await setStaple(name, buy)
+      this.shoppingList = res.items
+      this.pantry = res.pantry ?? []
     },
 
     markSaved(): void {
