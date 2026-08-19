@@ -59,6 +59,7 @@ class Recipe(BaseModel):
     icon: str
     description: str
     servings: int
+    category: Literal["meal", "bake"] = "meal"
     total_time_min_low: int | None = None
     total_time_min_high: int | None = None
     tags: list[str] = Field(default_factory=list)

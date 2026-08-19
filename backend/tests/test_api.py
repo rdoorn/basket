@@ -12,10 +12,11 @@ from httpx import ASGITransport, AsyncClient
 from mongomock_motor import AsyncMongoMockClient
 
 from app.adapters.db.mongo_menu_repo import MongoMenuRepo
+from app.adapters.db.mongo_pet_food_repo import MongoPetFoodRepo
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
-from app.api.deps import get_menu_repo, get_recipe_repo
+from app.api.deps import get_menu_repo, get_pet_food_repo, get_recipe_repo
 from app.main import app
-from app.seed import seed_missing
+from app.seed import seed_missing, seed_pet_foods_if_empty
 
 
 @pytest_asyncio.fixture
@@ -24,10 +25,13 @@ async def client():
     db = AsyncMongoMockClient()["basket_test"]
     recipe_repo = MongoRecipeRepo(db)
     menu_repo = MongoMenuRepo(db)
+    pet_food_repo = MongoPetFoodRepo(db)
     await seed_missing(recipe_repo)
+    await seed_pet_foods_if_empty(pet_food_repo)
 
     app.dependency_overrides[get_recipe_repo] = lambda: recipe_repo
     app.dependency_overrides[get_menu_repo] = lambda: menu_repo
+    app.dependency_overrides[get_pet_food_repo] = lambda: pet_food_repo
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -49,11 +53,13 @@ async def test_list_recipes_returns_seed_card(client):
     resp = await client.get("/recipes")
     assert resp.status_code == 200
     cards = resp.json()
-    assert len(cards) == 4
+    assert len(cards) == 5
     by_id = {c["id"]: c for c in cards}
     assert "macaroni-alla-siciliana" in by_id
     assert "spaghetti-bolognese" in by_id
     assert by_id["macaroni-alla-siciliana"]["icon"] == "🍝"
+    assert by_id["macaroni-alla-siciliana"]["category"] == "meal"
+    assert by_id["zachte-dierbroodjes"]["category"] == "bake"
 
 
 @pytest.mark.asyncio
@@ -176,6 +182,34 @@ async def test_delete_assignment_clears_day(client):
 
 
 @pytest.mark.asyncio
+async def test_extras_add_and_remove(client):
+    rid = "macaroni-alla-siciliana"
+    r = await client.put(
+        "/weekmenu/extras", json={"recipeId": rid, "multiplier": 2.0}
+    )
+    assert r.status_code == 200
+    assert any(
+        e["recipeId"] == rid and e["multiplier"] == 2.0
+        for e in r.json()["extras"]
+    )
+    got = await client.get("/weekmenu")
+    assert any(e["recipeId"] == rid for e in got.json()["extras"])
+    d = await client.delete(f"/weekmenu/extras/{rid}")
+    assert all(e["recipeId"] != rid for e in d.json()["extras"])
+
+
+@pytest.mark.asyncio
+async def test_extras_fold_into_shopping_list(client):
+    rid = "macaroni-alla-siciliana"
+    await client.put(
+        "/weekmenu/extras", json={"recipeId": rid, "multiplier": 2.0}
+    )
+    resp = await client.get("/shopping-list")
+    items = {i["name"]: i for i in resp.json()["items"]}
+    assert items["macaroni"]["quantity"] == 700
+
+
+@pytest.mark.asyncio
 async def test_shopping_list_scales_by_multiplier(client):
     rid = "macaroni-alla-siciliana"
     await client.put(
@@ -283,3 +317,110 @@ async def test_non_staple_can_be_moved_to_pantry_and_back(client):
     body2 = back.json()
     assert any(i["name"] == "rode paprika" for i in body2["items"])
     assert all(i["name"] != "rode paprika" for i in body2["pantry"])
+
+
+# ---------------------------------------------------------------------------
+# Pet food
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pet_foods_crud(client):
+    listed = await client.get("/pet/foods")
+    assert listed.status_code == 200
+    names = {f["name"] for f in listed.json()}
+    assert {"paprika", "wortel"} <= names
+    assert all("weightG" in f and "id" in f for f in listed.json())
+
+    created = await client.post("/pet/foods", json={"name": "sla", "weightG": 200})
+    assert created.status_code == 200
+    body = created.json()
+    assert body["name"] == "sla"
+    assert body["weightG"] == 200
+    assert body["id"]
+
+    deleted = await client.delete(f"/pet/foods/{body['id']}")
+    assert deleted.status_code == 200
+    after = {f["name"] for f in (await client.get("/pet/foods")).json()}
+    assert "sla" not in after
+
+
+@pytest.mark.asyncio
+async def test_pet_get_defaults(client):
+    resp = await client.get("/pet")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["targetG"] == 1000
+    assert body["selection"] == []
+
+
+@pytest.mark.asyncio
+async def test_pet_regenerate_fills_selection(client):
+    resp = await client.post("/pet/regenerate")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["targetG"] == 1000
+    assert len(body["selection"]) >= 1
+    for pick in body["selection"]:
+        assert {"id", "name", "weightG"} <= set(pick)
+    # Persisted and surfaced in the shopping list under Huisdiervoer.
+    shopping = (await client.get("/shopping-list")).json()
+    pet = [i for i in shopping["items"] if i["group"] == "Huisdiervoer"]
+    picked = {p["name"] for p in body["selection"]}
+    assert {i["name"] for i in pet} == picked
+    assert all(i["quantity"] is None and i["staple"] is False for i in pet)
+    # Never in the pantry.
+    assert all(i["group"] != "Huisdiervoer" for i in shopping["pantry"])
+
+
+@pytest.mark.asyncio
+async def test_pet_selection_is_priced(client):
+    await client.post("/pet/regenerate")
+    picked = {
+        p["name"] for p in (await client.get("/pet")).json()["selection"]
+    }
+    quotes = (await client.post("/pricing/quote")).json()["quotes"]
+    for q in quotes:
+        priced = {i["name"] for i in q["items"]}
+        assert picked <= priced
+
+
+@pytest.mark.asyncio
+async def test_pet_target_adjusts_and_reselects(client):
+    await client.post("/pet/regenerate")
+    resp = await client.put("/pet/target", json={"targetG": 1500})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["targetG"] == 1500
+    assert len(body["selection"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_pet_replace_swaps_one(client):
+    regen = (await client.post("/pet/regenerate")).json()
+    victim = regen["selection"][0]["name"]
+    resp = await client.post("/pet/replace", json={"name": victim})
+    assert resp.status_code == 200
+    body = resp.json()
+    # Either it was swapped out, or (list exhausted) it remained — both valid;
+    # the selection size never changes on a replace.
+    assert len(body["selection"]) == len(regen["selection"])
+
+
+@pytest.mark.asyncio
+async def test_deleting_selected_pet_food_scrubs_selection(client):
+    # A deleted food must vanish from the selection AND the shopping bag, not
+    # linger as a stale name that only the pricing/bag paths still surface.
+    regen = (await client.post("/pet/regenerate")).json()
+    assert regen["selection"], "expected a non-empty selection to test with"
+    victim = regen["selection"][0]
+    resp = await client.delete(f"/pet/foods/{victim['id']}")
+    assert resp.status_code == 200
+    assert all(f["id"] != victim["id"] for f in resp.json())
+    # gone from the resolved selection
+    pet = (await client.get("/pet")).json()
+    assert all(f["name"] != victim["name"] for f in pet["selection"])
+    # gone from the shopping bag's Huisdiervoer group
+    items = (await client.get("/shopping-list")).json()["items"]
+    pet_names = {i["name"] for i in items if i.get("group") == "Huisdiervoer"}
+    assert victim["name"] not in pet_names

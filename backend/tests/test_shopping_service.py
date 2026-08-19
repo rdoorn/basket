@@ -31,6 +31,21 @@ def test_scales_and_aggregates_same_ingredient():
     assert by_name["ui"].quantity == 3
 
 
+def test_extras_fold_in_scaled_by_multiplier():
+    recipe = Recipe(
+        id="B", title="t", icon="🍞", description="", servings=8,
+        total_time_min_low=None, total_time_min_high=None, tags=[], notes=None,
+        ingredients=[Ingredient(name="macaroni", quantity=350, unit="g")],
+        steps=[],
+    )
+    menu = WeekMenu()
+    menu.set("d1", DayAssignment(recipe_id="B", multiplier=1.0))
+    menu.set_extra("B", 2.0)
+    items = build_shopping_list(menu, {"B": recipe})
+    by_name = {i.name: i for i in items}
+    assert by_name["macaroni"].quantity == 1050  # 350 + 700
+
+
 def test_none_quantity_listed_once_not_aggregated():
     recipe = Recipe(
         id="B", title="t", icon="🌿", description="", servings=4,
@@ -165,6 +180,28 @@ def test_partition_matches_choices_case_insensitively():
     items = [ShoppingListItem(name="Zwarte Peper", quantity=None, unit=None)]
     breakdown = partition_items(items, item_choices={})
     assert [i.name for i in breakdown.pantry] == ["Zwarte Peper"]
+
+
+PET_GROUP = "Huisdiervoer"
+
+
+def test_build_breakdown_appends_pet_selection_to_items():
+    menu = WeekMenu()
+    menu.pet_selection = ["wortel", "paprika"]
+    breakdown = build_breakdown(menu, {})
+    pet = [i for i in breakdown.items if i.group == PET_GROUP]
+    assert {i.name for i in pet} == {"wortel", "paprika"}
+    for item in pet:
+        assert item.quantity is None
+        assert item.staple is False
+        assert item.source == "supermarket"
+
+
+def test_pet_items_never_land_in_pantry():
+    menu = WeekMenu()
+    menu.pet_selection = ["wortel"]
+    breakdown = build_breakdown(menu, {})
+    assert all(i.group != PET_GROUP for i in breakdown.pantry)
 
 
 def test_build_breakdown_uses_menu_item_choices():

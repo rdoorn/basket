@@ -7,6 +7,7 @@ import {
   getRecipe,
   updateRecipe,
   type Ingredient,
+  type RecipeCategory,
   type RecipeInput,
   type Step,
   type StepPhase,
@@ -48,6 +49,7 @@ const form = reactive<RecipeInput>({
   icon: '🍽️',
   description: '',
   servings: 4,
+  category: 'meal',
   total_time_min_low: null,
   total_time_min_high: null,
   tags: [],
@@ -57,6 +59,7 @@ const form = reactive<RecipeInput>({
 })
 
 const phases: StepPhase[] = ['prep', 'cook', 'finish']
+const categories: RecipeCategory[] = ['meal', 'bake']
 
 onMounted(async () => {
   if (props.id) {
@@ -66,6 +69,7 @@ onMounted(async () => {
       form.icon = recipe.icon
       form.description = recipe.description
       form.servings = recipe.servings
+      form.category = recipe.category
       form.total_time_min_low = recipe.total_time_min_low
       form.total_time_min_high = recipe.total_time_min_high
       form.tags = recipe.tags
@@ -182,6 +186,14 @@ async function remove(): Promise<void> {
         <label class="num">
           Personen
           <input v-model.number="form.servings" type="number" min="1" />
+        </label>
+        <label class="num">
+          Categorie
+          <select v-model="form.category" class="phase-in">
+            <option v-for="c in categories" :key="c" :value="c">
+              {{ c === 'bake' ? 'Baksel' : 'Maaltijd' }}
+            </option>
+          </select>
         </label>
       </div>
       <label class="block">

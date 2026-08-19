@@ -28,6 +28,9 @@ class MongoMenuRepo(MenuRepo):
             {
                 "assignments": doc.get("assignments", {}),
                 "item_choices": doc.get("item_choices", {}),
+                "extras": doc.get("extras", []),
+                "pet_target_g": doc.get("pet_target_g", 1000),
+                "pet_selection": doc.get("pet_selection", []),
             }
         )
 
@@ -37,6 +40,9 @@ class MongoMenuRepo(MenuRepo):
         payload: dict[str, Any] = {
             "assignments": dump["assignments"],
             "item_choices": dump["item_choices"],
+            "extras": dump["extras"],
+            "pet_target_g": dump["pet_target_g"],
+            "pet_selection": dump["pet_selection"],
         }
         await self._collection.replace_one(
             {"_id": _DOC_ID},

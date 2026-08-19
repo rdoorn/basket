@@ -138,6 +138,30 @@ async def test_menu_round_trips_item_choices():
 
 
 @pytest.mark.asyncio
+async def test_menu_round_trips_extras_and_pet_fields():
+    repo = MongoMenuRepo(_db())
+    menu = WeekMenu()
+    menu.set_extra("zachte-dierbroodjes", 2.0)
+    menu.pet_target_g = 1250
+    menu.pet_selection = ["paprika"]
+    await repo.save(menu)
+    loaded = await repo.load()
+    assert loaded.extras[0].recipe_id == "zachte-dierbroodjes"
+    assert loaded.extras[0].multiplier == 2.0
+    assert loaded.pet_target_g == 1250
+    assert loaded.pet_selection == ["paprika"]
+
+
+@pytest.mark.asyncio
+async def test_menu_load_absent_defaults_pet_fields():
+    repo = MongoMenuRepo(_db())
+    menu = await repo.load()
+    assert menu.extras == []
+    assert menu.pet_target_g == 1000
+    assert menu.pet_selection == []
+
+
+@pytest.mark.asyncio
 async def test_menu_save_upserts_single_document():
     db = _db()
     repo = MongoMenuRepo(db)

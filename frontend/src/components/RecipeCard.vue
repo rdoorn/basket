@@ -29,7 +29,10 @@ function openDetail(): void {
   >
     <span class="icon">{{ recipe.icon }}</span>
     <div class="body">
-      <div class="title">{{ recipe.title }}</div>
+      <div class="title">
+        {{ recipe.title }}
+        <span v-if="recipe.category === 'bake'" class="badge" title="Baksel">🍞</span>
+      </div>
       <div class="desc">{{ recipe.description }}</div>
     </div>
   </div>
@@ -58,6 +61,11 @@ function openDetail(): void {
 
 .title {
   font-weight: 600;
+}
+
+.badge {
+  margin-left: 0.25rem;
+  font-size: 0.9rem;
 }
 
 .desc {

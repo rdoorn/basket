@@ -12,9 +12,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.deps import get_recipe_repo
-from app.api.routers import pricing, recipes, shopping, weekmenu
-from app.seed import seed_missing
+from app.api.deps import get_pet_food_repo, get_recipe_repo
+from app.api.routers import pet, pricing, recipes, shopping, weekmenu
+from app.seed import seed_missing, seed_pet_foods_if_empty
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """
     try:
         await seed_missing(get_recipe_repo())
+        await seed_pet_foods_if_empty(get_pet_food_repo())
     except Exception as exc:  # noqa: BLE001 - startup must never crash on seed
         logger.warning("Startup seed skipped: %s", exc)
     yield
@@ -50,3 +51,4 @@ app.include_router(recipes.router)
 app.include_router(weekmenu.router)
 app.include_router(shopping.router)
 app.include_router(pricing.router)
+app.include_router(pet.router)

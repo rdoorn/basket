@@ -29,12 +29,15 @@ export interface Step {
   instructions: string
 }
 
+export type RecipeCategory = 'meal' | 'bake'
+
 export interface Recipe {
   id: string
   title: string
   icon: string
   description: string
   servings: number
+  category: RecipeCategory
   total_time_min_low: number | null
   total_time_min_high: number | null
   tags: string[]
@@ -52,6 +55,7 @@ export interface RecipeCard {
   title: string
   icon: string
   description: string
+  category: RecipeCategory
 }
 
 export interface Assignment {
@@ -64,8 +68,28 @@ export interface WeekMenuDay {
   assignment: Assignment | null
 }
 
+// A recipe in the bag without a date (Extra's zone).
+export interface Extra {
+  recipeId: string
+  multiplier: number
+}
+
 export interface WeekMenu {
   days: WeekMenuDay[]
+  extras: Extra[]
+}
+
+// A single editable pet food with a static grams-per-purchase guess.
+export interface PetFood {
+  id: string
+  name: string
+  weightG: number
+}
+
+// Current pet-food selection state.
+export interface Pet {
+  targetG: number
+  selection: PetFood[]
 }
 
 export interface AssignmentsResponse {
@@ -85,6 +109,8 @@ export interface ShoppingItem {
   unit: string | null
   source: string
   staple: boolean
+  // null for recipe items; "Huisdiervoer" for pet foods.
+  group: string | null
 }
 
 export interface ShoppingListResponse {
@@ -182,6 +208,62 @@ export function deleteAssignment(date: string): Promise<AssignmentsResponse> {
   })
 }
 
+// Append or update an extra (recipe without a date). Returns the full menu.
+export function putExtra(recipeId: string, multiplier: number): Promise<WeekMenu> {
+  return request<WeekMenu>('/weekmenu/extras', {
+    method: 'PUT',
+    body: JSON.stringify({ recipeId, multiplier }),
+  })
+}
+
+// Remove an extra by recipe id. Returns the full menu.
+export function deleteExtra(recipeId: string): Promise<WeekMenu> {
+  return request<WeekMenu>(`/weekmenu/extras/${recipeId}`, {
+    method: 'DELETE',
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Pet food endpoints.
+// ---------------------------------------------------------------------------
+
+export function listPetFoods(): Promise<PetFood[]> {
+  return request<PetFood[]>('/pet/foods')
+}
+
+export function addPetFood(name: string, weightG: number): Promise<PetFood> {
+  return request<PetFood>('/pet/foods', {
+    method: 'POST',
+    body: JSON.stringify({ name, weightG }),
+  })
+}
+
+export function deletePetFood(id: string): Promise<PetFood[]> {
+  return request<PetFood[]>(`/pet/foods/${id}`, { method: 'DELETE' })
+}
+
+export function getPet(): Promise<Pet> {
+  return request<Pet>('/pet')
+}
+
+export function setPetTarget(targetG: number): Promise<Pet> {
+  return request<Pet>('/pet/target', {
+    method: 'PUT',
+    body: JSON.stringify({ targetG }),
+  })
+}
+
+export function regeneratePet(): Promise<Pet> {
+  return request<Pet>('/pet/regenerate', { method: 'POST', body: '{}' })
+}
+
+export function replacePetFood(name: string): Promise<Pet> {
+  return request<Pet>('/pet/replace', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Shopping list + pricing.
 // ---------------------------------------------------------------------------
@@ -212,9 +294,18 @@ export const api = {
   getWeekMenu,
   putAssignment,
   deleteAssignment,
+  putExtra,
+  deleteExtra,
   getShoppingList,
   setItemBuy,
   quotePricing,
+  listPetFoods,
+  addPetFood,
+  deletePetFood,
+  getPet,
+  setPetTarget,
+  regeneratePet,
+  replacePetFood,
 }
 
 export type Api = typeof api

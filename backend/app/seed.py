@@ -5,10 +5,23 @@ elaborate Dutch instructions (including per-step reasoning) verbatim. Also
 provides :func:`seed_if_empty` to insert it once when the recipe collection is
 empty (idempotent).
 """
+from app.domain.pet import PetFood
 from app.domain.recipe import Ingredient, Recipe, Step
+from app.ports.pet_food_repo import PetFoodRepo
 from app.ports.recipe_repo import RecipeRepo
 
 SEED_RECIPE_ID = "macaroni-alla-siciliana"
+
+# Editable, cavia-friendly starter list. ``weight_g`` is a static guess of the
+# grams per purchase-unit used only as a guide by ``pet_service``.
+PET_FOOD_SEED: list[PetFood] = [
+    PetFood(id="paprika", name="paprika", weight_g=150),
+    PetFood(id="komkommer", name="komkommer", weight_g=400),
+    PetFood(id="ijsbergsla", name="ijsbergsla", weight_g=400),
+    PetFood(id="wortel", name="wortel", weight_g=80),
+    PetFood(id="andijvie", name="andijvie", weight_g=300),
+    PetFood(id="veldsla", name="veldsla", weight_g=100),
+]
 
 
 def build_seed_recipe() -> Recipe:
@@ -610,6 +623,268 @@ def build_salade_kip_pesto() -> Recipe:
     )
 
 
+def build_dierbroodjes() -> Recipe:
+    """Return the Zachte Dierbroodjes bake recipe (Japanse/Koreaanse stijl).
+
+    A ``category="bake"`` recipe with a soft, enriched dough (broodmeel, ei,
+    melk, boter) shaped into little animals and decorated. The steps preserve
+    the full elaborate Dutch text — mixing, two kneading phases, chilling,
+    portioning, shaping, a second proof (vingertest), decorating and baking to
+    a 93–95 °C core — including the reasoning and notes verbatim. Ingredients
+    are grouped Deeg / Decoratie / Glans.
+    """
+    ingredients = [
+        # Deeg
+        Ingredient(
+            group="Deeg",
+            name="broodmeel",
+            quantity=310,
+            unit="g",
+            note="tarwebloem met hoog eiwitgehalte; volgende keer broodmeel",
+        ),
+        Ingredient(group="Deeg", name="suiker", quantity=28, unit="g"),
+        Ingredient(group="Deeg", name="zout", quantity=3, unit="g"),
+        Ingredient(
+            group="Deeg", name="instant gist", quantity=3.5, unit="g"
+        ),
+        Ingredient(
+            group="Deeg",
+            name="ei",
+            quantity=56,
+            unit="g",
+            note="losgeklopt, ongeveer 1 middelgroot ei",
+        ),
+        Ingredient(
+            group="Deeg",
+            name="melk",
+            quantity=155,
+            unit="g",
+            note="lauwwarm",
+        ),
+        Ingredient(
+            group="Deeg",
+            name="ongezouten boter",
+            quantity=31,
+            unit="g",
+            note="op kamertemperatuur, in blokjes",
+        ),
+        # Decoratie
+        Ingredient(
+            group="Decoratie",
+            name="zwarte sesam",
+            quantity=None,
+            unit=None,
+            note="voor oogjes",
+        ),
+        Ingredient(
+            group="Decoratie",
+            name="ham",
+            quantity=None,
+            unit=None,
+            note="voor snuitjes/oortjes, optioneel",
+        ),
+        Ingredient(
+            group="Decoratie",
+            name="nori",
+            quantity=None,
+            unit=None,
+            note="voor detail, optioneel",
+        ),
+        # Glans
+        Ingredient(
+            group="Glans",
+            name="melk óf losgeklopt ei",
+            quantity=None,
+            unit=None,
+            note="dun bestrijken voor glans, optioneel",
+        ),
+    ]
+
+    steps = [
+        Step(
+            order=1,
+            title="Droge en natte ingrediënten mengen",
+            phase="prep",
+            duration_min_low=5,
+            duration_min_high=5,
+            instructions=(
+                "Doe het broodmeel, de suiker, het zout en de instant gist in "
+                "een kom. Houd het zout en de gist bij het toevoegen even uit "
+                "elkaar zodat het zout de gist niet direct remt. Voeg het "
+                "losgeklopte ei en de lauwwarme melk toe en meng tot er geen "
+                "droog meel meer zichtbaar is. Het deeg is in dit stadium nog "
+                "plakkerig en ruw — dat hoort zo."
+            ),
+        ),
+        Step(
+            order=2,
+            title="Eerste kneedfase",
+            phase="prep",
+            duration_min_low=8,
+            duration_min_high=10,
+            instructions=(
+                "Kneed het deeg 8 tot 10 minuten (machine op stand 2 of met de "
+                "hand) tot het samenkomt tot een gladdere, elastische bal. Het "
+                "deeg moet zich van de rand van de kom losmaken maar mag onderin "
+                "nog licht plakken. Nog niet perfect glad — de boter komt zo."
+            ),
+        ),
+        Step(
+            order=3,
+            title="Boter toevoegen",
+            phase="prep",
+            duration_min_low=8,
+            duration_min_high=10,
+            instructions=(
+                "Voeg de zachte boter beetje bij beetje toe, een paar blokjes "
+                "tegelijk, en kneed steeds door tot de boter volledig is "
+                "opgenomen voordat je meer toevoegt. Het deeg valt eerst weer "
+                "uit elkaar en wordt vettig; blijf kneden tot het opnieuw "
+                "samenkomt tot een soepel, glanzend geheel. Dit duurt nog eens "
+                "8 tot 10 minuten."
+            ),
+        ),
+        Step(
+            order=4,
+            title="Uitkneden tot vliesje",
+            phase="prep",
+            duration_min_low=3,
+            duration_min_high=5,
+            instructions=(
+                "Kneed door tot het deeg het vliesstadium (windowpane) haalt: "
+                "trek een stukje deeg voorzichtig uit; het moet zo dun rekken "
+                "dat je er licht doorheen ziet zonder direct te scheuren. Dit "
+                "geeft de karakteristieke pluizige, draderige structuur van "
+                "zacht Japans/Koreaans brood."
+            ),
+        ),
+        Step(
+            order=5,
+            title="Koelen in de vriezer",
+            phase="cook",
+            duration_min_low=30,
+            duration_min_high=30,
+            instructions=(
+                "Leg het deeg ongeveer 30 minuten in de vriezer (of langer in "
+                "de koelkast). Dit verstevigt de boter en het deeg, waardoor het "
+                "straks veel makkelijker te vormen is en niet plakt. Het is geen "
+                "volledige rijs — het gaat vooral om koelen en licht ontspannen "
+                "van het deeg."
+            ),
+        ),
+        Step(
+            order=6,
+            title="Verdelen in porties",
+            phase="prep",
+            duration_min_low=5,
+            duration_min_high=5,
+            instructions=(
+                "Weeg het deeg en verdeel het in 8 gelijke stukken van ongeveer "
+                "73 g. Werk elk stuk kort bol door de randen naar onderen te "
+                "vouwen, zodat je een strak boloppervlak krijgt. Dek de bolletjes "
+                "af met een vochtige doek zodat ze niet uitdrogen terwijl je "
+                "vormt."
+            ),
+        ),
+        Step(
+            order=7,
+            title="Dieren vormen",
+            phase="prep",
+            duration_min_low=15,
+            duration_min_high=20,
+            instructions=(
+                "Vorm van elk bolletje een dier: knijp oortjes uit voor een "
+                "beertje of konijn, rol dunne slierten voor staartjes of "
+                "snuitjes, en gebruik kleine deegstukjes voor uitstekende "
+                "details. Druk toevoegingen goed aan zodat ze tijdens het bakken "
+                "niet loslaten. Werk rustig — een strak, glad oppervlak bakt het "
+                "mooist op."
+            ),
+        ),
+        Step(
+            order=8,
+            title="Tweede rijs (vingertest)",
+            phase="cook",
+            duration_min_low=60,
+            duration_min_high=90,
+            instructions=(
+                "Laat de gevormde dieren afgedekt 60 tot 90 minuten rijzen op "
+                "een warme, tochtvrije plek tot ze duidelijk zijn opgezwollen. "
+                "Controleer met de vingertest: druk zachtjes met een licht "
+                "bevochtigde vinger in het deeg. Veert het langzaam en niet "
+                "helemaal terug (er blijft een kleine deuk staan), dan is het "
+                "klaar. Veert het meteen volledig terug, laat dan nog even "
+                "doorrijzen."
+            ),
+        ),
+        Step(
+            order=9,
+            title="Decoreren en bestrijken",
+            phase="finish",
+            duration_min_low=5,
+            duration_min_high=5,
+            instructions=(
+                "Bestrijk de broodjes desgewenst heel dun met melk of losgeklopt "
+                "ei voor een zachte glans (te dik bestrijken maakt de details "
+                "dof). Zet oogjes met zwarte sesam en gebruik stukjes ham of "
+                "nori voor snuitjes, oortjes of andere details. Doe dit vlak voor "
+                "het bakken zodat de decoraties op hun plek blijven."
+            ),
+        ),
+        Step(
+            order=10,
+            title="Bakken",
+            phase="cook",
+            duration_min_low=20,
+            duration_min_high=23,
+            instructions=(
+                "Bak de broodjes in een op 170 °C voorverwarmde oven 20 tot 23 "
+                "minuten tot ze licht goudbruin zijn. Ze zijn gaar bij een "
+                "kerntemperatuur van 93 tot 95 °C — meet met een "
+                "kernthermometer voor zekerheid. Worden ze te snel donker, dek "
+                "ze dan losjes af met folie."
+            ),
+        ),
+        Step(
+            order=11,
+            title="Laten liggen en afkoelen",
+            phase="finish",
+            duration_min_low=25,
+            duration_min_high=35,
+            instructions=(
+                "Laat de broodjes eerst 5 minuten in de vorm/op de plaat liggen "
+                "en haal ze daarna voorzichtig over op een rooster. Laat ze nog "
+                "20 tot 30 minuten volledig afkoelen. Snijd of trek ze niet "
+                "direct open: het kruim moet nog nazetten, anders wordt het "
+                "klef. Afgekoeld zijn ze pluizig en zacht."
+            ),
+        ),
+    ]
+
+    return Recipe(
+        id="zachte-dierbroodjes",
+        title="Zachte Dierbroodjes (Japanse/Koreaanse stijl)",
+        icon="🍞",
+        description=(
+            "Zachte, pluizige verrijkte broodjes in dierenvorm — met ei, melk "
+            "en boter voor een luchtige, draderige structuur."
+        ),
+        category="bake",
+        servings=8,
+        total_time_min_low=150,
+        total_time_min_high=185,
+        tags=["bake", "brood"],
+        notes=(
+            "Rijstijden zijn in de totale tijd meegerekend. Gebruik volgende "
+            "keer broodmeel voor nog meer pluizigheid. Vertrouw op de "
+            "vingertest voor de tweede rijs en op een kern van 93–95 °C voor "
+            "gaarheid; snijd de broodjes niet direct na het bakken open."
+        ),
+        ingredients=ingredients,
+        steps=steps,
+    )
+
+
 def seed_recipes() -> list[Recipe]:
     """Return every recipe that ships with the app."""
     return [
@@ -617,6 +892,7 @@ def seed_recipes() -> list[Recipe]:
         build_spaghetti_bolognese(),
         build_salade_garnalen(),
         build_salade_kip_pesto(),
+        build_dierbroodjes(),
     ]
 
 
@@ -629,3 +905,15 @@ async def seed_missing(repo: RecipeRepo) -> None:
     for recipe in seed_recipes():
         if await repo.get(recipe.id) is None:
             await repo.create(recipe)
+
+
+async def seed_pet_foods_if_empty(repo: PetFoodRepo) -> None:
+    """Insert the pet-food starter list once when the collection is empty.
+
+    Idempotent: seeds only when no pet foods exist yet, so a user's edits to
+    the list are never overwritten on a later start.
+    """
+    if await repo.count() > 0:
+        return
+    for food in PET_FOOD_SEED:
+        await repo.create(food)

@@ -6,6 +6,8 @@ import RecipeCard from '../components/RecipeCard.vue'
 import DayCell from '../components/DayCell.vue'
 import ShoppingList from '../components/ShoppingList.vue'
 import PantryList from '../components/PantryList.vue'
+import ExtrasZone from '../components/ExtrasZone.vue'
+import PetPanel from '../components/PetPanel.vue'
 
 const store = useMenuStore()
 const router = useRouter()
@@ -84,26 +86,31 @@ function onDemote(name: string): void {
         <RecipeCard v-for="r in store.recipes" :key="r.id" :recipe="r" />
       </section>
 
-      <section class="grid">
-        <DayCell
-          v-for="date in store.days"
-          :key="date"
-          :date="date"
-          :assignment="store.assignments[date] ?? null"
-          :recipe="
-            store.assignments[date]
-              ? store.recipeById(store.assignments[date].recipeId)
-              : undefined
-          "
-          @assign="onAssign"
-          @move="onMove"
-          @multiplier="onMultiplier"
-          @remove="onRemove"
-        />
-      </section>
+      <div class="middle">
+        <section class="grid">
+          <DayCell
+            v-for="date in store.days"
+            :key="date"
+            :date="date"
+            :assignment="store.assignments[date] ?? null"
+            :recipe="
+              store.assignments[date]
+                ? store.recipeById(store.assignments[date].recipeId)
+                : undefined
+            "
+            @assign="onAssign"
+            @move="onMove"
+            @multiplier="onMultiplier"
+            @remove="onRemove"
+          />
+        </section>
+
+        <ExtrasZone />
+      </div>
 
       <div class="side">
         <ShoppingList :items="store.shoppingList" @demote="onDemote" />
+        <PetPanel />
         <PantryList :items="store.pantry" @promote="onPromote" />
       </div>
     </div>
@@ -148,6 +155,12 @@ function onDemote(name: string): void {
 .library h2 {
   margin: 0;
   font-size: 1rem;
+}
+
+.middle {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .grid {

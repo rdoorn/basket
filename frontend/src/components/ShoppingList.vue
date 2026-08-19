@@ -1,9 +1,24 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ShoppingItem } from '../api/client'
 
-defineProps<{ items: ShoppingItem[] }>()
+const props = defineProps<{ items: ShoppingItem[] }>()
 
 const emit = defineEmits<{ (e: 'demote', name: string): void }>()
+
+// Ungrouped recipe items come first, then each named group (e.g. Huisdiervoer).
+const ungrouped = computed(() => props.items.filter((i) => !i.group))
+const groups = computed(() => {
+  const map = new Map<string, ShoppingItem[]>()
+  for (const item of props.items) {
+    if (item.group) {
+      const bucket = map.get(item.group) ?? []
+      bucket.push(item)
+      map.set(item.group, bucket)
+    }
+  }
+  return [...map.entries()].map(([name, items]) => ({ name, items }))
+})
 
 function formatQty(item: ShoppingItem): string {
   if (item.quantity === null) {
@@ -20,20 +35,40 @@ function formatQty(item: ShoppingItem): string {
   <aside class="shopping">
     <h2>Boodschappenlijst</h2>
     <p v-if="items.length === 0" class="empty">Nog geen recepten ingepland.</p>
-    <ul v-else>
-      <li v-for="item in items" :key="`${item.name}-${item.unit}`">
-        <button
-          class="demote"
-          type="button"
-          title="Verplaats naar 'heb ik vast wel'"
-          @click="emit('demote', item.name)"
-        >
-          −
-        </button>
-        <span class="name">{{ item.name }}</span>
-        <span class="qty">{{ formatQty(item) }}</span>
-      </li>
-    </ul>
+    <template v-else>
+      <ul v-if="ungrouped.length > 0">
+        <li v-for="item in ungrouped" :key="`${item.name}-${item.unit}`">
+          <button
+            class="demote"
+            type="button"
+            title="Verplaats naar 'heb ik vast wel'"
+            @click="emit('demote', item.name)"
+          >
+            −
+          </button>
+          <span class="name">{{ item.name }}</span>
+          <span class="qty">{{ formatQty(item) }}</span>
+        </li>
+      </ul>
+
+      <div v-for="group in groups" :key="group.name" class="group">
+        <h3>{{ group.name }}</h3>
+        <ul>
+          <li v-for="item in group.items" :key="`${item.name}-${item.unit}`">
+            <button
+              class="demote"
+              type="button"
+              title="Verplaats naar 'heb ik vast wel'"
+              @click="emit('demote', item.name)"
+            >
+              −
+            </button>
+            <span class="name">{{ item.name }}</span>
+            <span class="qty">{{ formatQty(item) }}</span>
+          </li>
+        </ul>
+      </div>
+    </template>
   </aside>
 </template>
 
@@ -53,6 +88,18 @@ function formatQty(item: ShoppingItem): string {
 .empty {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.group {
+  margin-top: 0.6rem;
+}
+
+.group h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 ul {

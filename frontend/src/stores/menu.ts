@@ -6,7 +6,18 @@ import {
   putAssignment,
   deleteAssignment,
   setItemBuy,
+  putExtra,
+  deleteExtra,
+  listPetFoods,
+  addPetFood,
+  deletePetFood,
+  getPet,
+  setPetTarget,
+  regeneratePet,
+  replacePetFood,
   type Assignment,
+  type Extra,
+  type PetFood,
   type RecipeCard,
   type ShoppingItem,
   type WeekMenuDay,
@@ -18,9 +29,17 @@ interface MenuState {
   // ordered 14-day window from the backend.
   days: string[]
   recipes: RecipeCard[]
+  // Recipes in the bag without a date (Extra's zone).
+  extras: Extra[]
   shoppingList: ShoppingItem[]
   // "Heb ik vast wel" staples not yet promoted into the shopping list.
   pantry: ShoppingItem[]
+  // Weekly pet-food weight target in grams.
+  petTarget: number
+  // Currently chosen pet foods.
+  petSelection: PetFood[]
+  // Editable master list of pet foods.
+  petFoods: PetFood[]
   loading: boolean
   lastSavedAt: string | null
 }
@@ -30,8 +49,12 @@ export const useMenuStore = defineStore('menu', {
     assignments: {},
     days: [],
     recipes: [],
+    extras: [],
     shoppingList: [],
     pantry: [],
+    petTarget: 1000,
+    petSelection: [],
+    petFoods: [],
     loading: false,
     lastSavedAt: null,
   }),
@@ -48,9 +71,18 @@ export const useMenuStore = defineStore('menu', {
     async loadAll(): Promise<void> {
       this.loading = true
       try {
-        const [recipes, menu] = await Promise.all([listRecipes(), getWeekMenu()])
+        const [recipes, menu, pet, petFoods] = await Promise.all([
+          listRecipes(),
+          getWeekMenu(),
+          getPet(),
+          listPetFoods(),
+        ])
         this.recipes = recipes
         this.setDaysFromMenu(menu.days)
+        this.extras = menu.extras ?? []
+        this.petTarget = pet.targetG
+        this.petSelection = pet.selection
+        this.petFoods = petFoods
         await this.refreshShoppingList()
       } finally {
         this.loading = false
@@ -124,6 +156,78 @@ export const useMenuStore = defineStore('menu', {
       delete this.assignments[date]
       await deleteAssignment(date)
       await this.refreshShoppingList()
+    },
+
+    // --- Extra's (dateless recipes) -------------------------------------
+
+    // Append or update an extra, then refresh the bag.
+    async addExtra(recipeId: string, multiplier: number): Promise<void> {
+      const menu = await putExtra(recipeId, multiplier)
+      this.extras = menu.extras ?? []
+      await this.refreshShoppingList()
+    },
+
+    // Change an extra's portion multiplier.
+    async setExtraMultiplier(recipeId: string, multiplier: number): Promise<void> {
+      const menu = await putExtra(recipeId, multiplier)
+      this.extras = menu.extras ?? []
+      await this.refreshShoppingList()
+    },
+
+    // Remove an extra from the bag.
+    async removeExtra(recipeId: string): Promise<void> {
+      const menu = await deleteExtra(recipeId)
+      this.extras = menu.extras ?? []
+      await this.refreshShoppingList()
+    },
+
+    // --- Pet food -------------------------------------------------------
+
+    // Load the current pet target + selection (no bag refresh needed).
+    async loadPet(): Promise<void> {
+      const pet = await getPet()
+      this.petTarget = pet.targetG
+      this.petSelection = pet.selection
+    },
+
+    // Rebuild the pet selection from scratch and refresh the bag.
+    async regeneratePet(): Promise<void> {
+      const pet = await regeneratePet()
+      this.petTarget = pet.targetG
+      this.petSelection = pet.selection
+      await this.refreshShoppingList()
+    },
+
+    // Adjust the weekly weight target (grams); re-selects and refreshes.
+    async setPetTarget(targetG: number): Promise<void> {
+      const pet = await setPetTarget(targetG)
+      this.petTarget = pet.targetG
+      this.petSelection = pet.selection
+      await this.refreshShoppingList()
+    },
+
+    // Swap one selected food for a random unselected one.
+    async replacePetFood(name: string): Promise<void> {
+      const pet = await replacePetFood(name)
+      this.petTarget = pet.targetG
+      this.petSelection = pet.selection
+      await this.refreshShoppingList()
+    },
+
+    // Load the editable master pet-food list.
+    async loadPetFoods(): Promise<void> {
+      this.petFoods = await listPetFoods()
+    },
+
+    // Add a food to the master list, then reload it.
+    async addPetFood(name: string, weightG: number): Promise<void> {
+      await addPetFood(name, weightG)
+      this.petFoods = await listPetFoods()
+    },
+
+    // Remove a food from the master list (API returns the updated list).
+    async deletePetFood(id: string): Promise<void> {
+      this.petFoods = await deletePetFood(id)
     },
 
     async refreshShoppingList(): Promise<void> {

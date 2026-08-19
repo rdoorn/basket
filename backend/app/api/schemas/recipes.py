@@ -4,6 +4,8 @@
 a full recipe body without a client-supplied id (the server owns ids). Full
 recipe responses reuse the domain :class:`Recipe` directly.
 """
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.domain.recipe import Ingredient, Recipe, Step
@@ -16,6 +18,7 @@ class RecipeCard(BaseModel):
     title: str
     icon: str
     description: str = ""
+    category: Literal["meal", "bake"] = "meal"
 
     @classmethod
     def from_recipe(cls, recipe: Recipe) -> "RecipeCard":
@@ -25,6 +28,7 @@ class RecipeCard(BaseModel):
             title=recipe.title,
             icon=recipe.icon,
             description=recipe.description,
+            category=recipe.category,
         )
 
 
@@ -36,6 +40,7 @@ class RecipeInput(BaseModel):
     icon: str
     description: str = ""
     servings: int
+    category: Literal["meal", "bake"] = "meal"
     total_time_min_low: int | None = None
     total_time_min_high: int | None = None
     tags: list[str] = Field(default_factory=list)

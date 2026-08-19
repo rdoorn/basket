@@ -1,6 +1,6 @@
 """Unit tests for the pure domain entities."""
 from app.domain.recipe import Recipe, Ingredient, Step
-from app.domain.menu import WeekMenu, DayAssignment
+from app.domain.menu import WeekMenu, DayAssignment, ExtraAssignment
 
 
 def test_ingredient_scaled():
@@ -47,6 +47,29 @@ def test_weekmenu_remove_and_missing_get_returns_none():
     m.remove("d1")
     assert m.get("d1") is None
     assert m.get("nope") is None
+
+
+def test_extras_add_update_remove():
+    m = WeekMenu()
+    m.set_extra("bread", 1.0)
+    assert m.extras == [ExtraAssignment(recipe_id="bread", multiplier=1.0)]
+    m.set_extra("bread", 2.0)  # update in place, no duplicate
+    assert len(m.extras) == 1 and m.extras[0].multiplier == 2.0
+    m.remove_extra("bread")
+    assert m.extras == []
+
+
+def test_recipe_defaults_to_meal_category():
+    r = Recipe(id="x", title="t", icon="🍝", description="", servings=2)
+    assert r.category == "meal"
+
+
+def test_recipe_accepts_bake_category():
+    r = Recipe(
+        id="x", title="t", icon="🍞", description="", servings=8,
+        category="bake",
+    )
+    assert r.category == "bake"
 
 
 def test_step_and_recipe_construct():

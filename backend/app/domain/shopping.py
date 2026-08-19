@@ -7,7 +7,9 @@ class ShoppingListItem(BaseModel):
 
     ``source`` carries the originating ingredient's sourcing (reserved for later
     features). ``staple`` marks a "heb ik vast wel" ingredient so the UI can
-    show a promote/un-promote control.
+    show a promote/un-promote control. ``group`` optionally sections the line in
+    the UI (e.g. ``"Huisdiervoer"`` for pet foods); recipe-derived items leave
+    it ``None``.
     """
 
     name: str
@@ -15,6 +17,7 @@ class ShoppingListItem(BaseModel):
     unit: str | None = None
     source: str = "supermarket"
     staple: bool = False
+    group: str | None = None
 
 
 class ShoppingBreakdown(BaseModel):

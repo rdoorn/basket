@@ -13,6 +13,7 @@ from app.api.schemas.menu import (
     AssignmentInput,
     AssignmentOut,
     DayOut,
+    ExtraInput,
     WeekMenuOut,
     WindowOut,
 )
@@ -43,7 +44,29 @@ async def get_weekmenu(repo: MenuRepo = Depends(get_menu_repo)) -> WindowOut:
                 ),
             )
         )
-    return WindowOut(days=days)
+    return WindowOut.from_menu(menu, days)
+
+
+@router.put("/extras", response_model=WeekMenuOut)
+async def put_extra(
+    body: ExtraInput, repo: MenuRepo = Depends(get_menu_repo)
+) -> WeekMenuOut:
+    """Append the recipe as an extra, or update its multiplier in place."""
+    menu = await repo.load()
+    menu.set_extra(body.recipe_id, body.multiplier)
+    await repo.save(menu)
+    return WeekMenuOut.from_menu(menu)
+
+
+@router.delete("/extras/{recipe_id}", response_model=WeekMenuOut)
+async def delete_extra(
+    recipe_id: str, repo: MenuRepo = Depends(get_menu_repo)
+) -> WeekMenuOut:
+    """Remove the extra for ``recipe_id`` and persist the menu."""
+    menu = await repo.load()
+    menu.remove_extra(recipe_id)
+    await repo.save(menu)
+    return WeekMenuOut.from_menu(menu)
 
 
 @router.put("/assignments", response_model=WeekMenuOut)

@@ -16,6 +16,8 @@ from app.domain.recipe import Recipe
 from app.domain.shopping import ShoppingBreakdown, ShoppingListItem
 from app.domain.staples import is_staple, normalize_name
 
+PET_GROUP = "Huisdiervoer"
+
 
 def build_shopping_list(
     menu: WeekMenu,
@@ -30,12 +32,18 @@ def build_shopping_list(
     """
     aggregated: dict[tuple[str, str | None], ShoppingListItem] = {}
 
-    for assignment in menu.assignments.values():
-        recipe = recipes_by_id.get(assignment.recipe_id)
+    def add(recipe_id: str, multiplier: float) -> None:
+        """Scale ``recipe_id``'s ingredients and merge them into ``aggregated``.
+
+        A missing recipe is skipped. The merge policy matches day assignments:
+        sum known quantities, prefer a number over ``None``, list ``None``
+        items once.
+        """
+        recipe = recipes_by_id.get(recipe_id)
         if recipe is None:
-            continue
+            return
         for ingredient in recipe.ingredients:
-            scaled = ingredient.scaled(assignment.multiplier)
+            scaled = ingredient.scaled(multiplier)
             key = (scaled.normalized_name or scaled.name, scaled.unit)
             existing = aggregated.get(key)
             if existing is None:
@@ -52,6 +60,11 @@ def build_shopping_list(
                 existing.quantity = scaled.quantity
             else:
                 existing.quantity += scaled.quantity
+
+    for assignment in menu.assignments.values():
+        add(assignment.recipe_id, assignment.multiplier)
+    for extra in menu.extras:
+        add(extra.recipe_id, extra.multiplier)
 
     return sorted(aggregated.values(), key=lambda item: item.name)
 
@@ -80,10 +93,30 @@ def partition_items(
     return ShoppingBreakdown(items=to_buy, pantry=pantry)
 
 
+def pet_items(pet_selection: list[str]) -> list[ShoppingListItem]:
+    """Turn the pet-food selection into buyable "Huisdiervoer" lines.
+
+    One line per selected food, with no per-item grams (``quantity=None``), per
+    the design: the weight is only an aggregate guide. Pet foods are never
+    staples and never go to the pantry.
+    """
+    return [
+        ShoppingListItem(name=name, quantity=None, unit=None, group=PET_GROUP)
+        for name in pet_selection
+    ]
+
+
 def build_breakdown(
     menu: WeekMenu,
     recipes_by_id: dict[str, Recipe],
 ) -> ShoppingBreakdown:
-    """Build the aggregated shopping list split into to-buy and pantry lists."""
+    """Build the aggregated shopping list split into to-buy and pantry lists.
+
+    Recipe-derived items are aggregated and split by the pantry policy; the
+    pet-food selection is appended to the buyable ``items`` under the
+    "Huisdiervoer" group and never participates in the staple split.
+    """
     items = build_shopping_list(menu, recipes_by_id)
-    return partition_items(items, menu.item_choices)
+    breakdown = partition_items(items, menu.item_choices)
+    breakdown.items.extend(pet_items(menu.pet_selection))
+    return breakdown

@@ -14,6 +14,15 @@ vi.mock('../src/api/client', async (importOriginal) => {
     putAssignment: vi.fn(),
     deleteAssignment: vi.fn(),
     setItemBuy: vi.fn(),
+    putExtra: vi.fn(),
+    deleteExtra: vi.fn(),
+    listPetFoods: vi.fn(),
+    addPetFood: vi.fn(),
+    deletePetFood: vi.fn(),
+    getPet: vi.fn(),
+    setPetTarget: vi.fn(),
+    regeneratePet: vi.fn(),
+    replacePetFood: vi.fn(),
   }
 })
 
@@ -24,6 +33,15 @@ const mocked = client as unknown as {
   putAssignment: ReturnType<typeof vi.fn>
   deleteAssignment: ReturnType<typeof vi.fn>
   setItemBuy: ReturnType<typeof vi.fn>
+  putExtra: ReturnType<typeof vi.fn>
+  deleteExtra: ReturnType<typeof vi.fn>
+  listPetFoods: ReturnType<typeof vi.fn>
+  addPetFood: ReturnType<typeof vi.fn>
+  deletePetFood: ReturnType<typeof vi.fn>
+  getPet: ReturnType<typeof vi.fn>
+  setPetTarget: ReturnType<typeof vi.fn>
+  regeneratePet: ReturnType<typeof vi.fn>
+  replacePetFood: ReturnType<typeof vi.fn>
 }
 
 describe('menu store — optimistic move/swap/multiplier', () => {
@@ -34,6 +52,16 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     mocked.putAssignment.mockResolvedValue({ assignments: {} })
     mocked.deleteAssignment.mockResolvedValue({ assignments: {} })
     mocked.getShoppingList.mockResolvedValue({ items: [], pantry: [] })
+    // Bag-changing pet/extra calls resolve; specific tests override as needed.
+    mocked.putExtra.mockResolvedValue({ days: [], extras: [] })
+    mocked.deleteExtra.mockResolvedValue({ days: [], extras: [] })
+    mocked.listPetFoods.mockResolvedValue([])
+    mocked.addPetFood.mockResolvedValue({ id: 'x', name: 'x', weightG: 0 })
+    mocked.deletePetFood.mockResolvedValue([])
+    mocked.getPet.mockResolvedValue({ targetG: 1000, selection: [] })
+    mocked.setPetTarget.mockResolvedValue({ targetG: 1000, selection: [] })
+    mocked.regeneratePet.mockResolvedValue({ targetG: 1000, selection: [] })
+    mocked.replacePetFood.mockResolvedValue({ targetG: 1000, selection: [] })
   })
 
   it('assign() sets an assignment on a day', async () => {
@@ -137,7 +165,9 @@ describe('menu store — optimistic move/swap/multiplier', () => {
       pantry: [],
     })
     const store = useMenuStore()
-    store.pantry = [{ name: 'gehakt', quantity: 300, unit: 'g', source: 'supermarket', staple: true }]
+    store.pantry = [
+      { name: 'gehakt', quantity: 300, unit: 'g', source: 'supermarket', staple: true, group: null },
+    ]
     await store.setItemBuy('gehakt', true)
     expect(mocked.setItemBuy).toHaveBeenCalledWith('gehakt', true)
     expect(store.shoppingList.map((i) => i.name)).toContain('gehakt')
@@ -153,14 +183,24 @@ describe('menu store — optimistic move/swap/multiplier', () => {
         { date: '2026-08-17', assignment: { recipeId: 'A', multiplier: 1 } },
         { date: '2026-08-18', assignment: null },
       ],
+      extras: [{ recipeId: 'B', multiplier: 2 }],
     })
     mocked.getShoppingList.mockResolvedValue({ items: [] })
+    mocked.getPet.mockResolvedValue({
+      targetG: 1500,
+      selection: [{ id: 'p1', name: 'wortel', weightG: 80 }],
+    })
+    mocked.listPetFoods.mockResolvedValue([{ id: 'p1', name: 'wortel', weightG: 80 }])
     const store = useMenuStore()
     await store.loadAll()
     expect(store.recipes).toHaveLength(1)
     expect(store.days).toHaveLength(2)
     expect(store.assignments['2026-08-17']).toEqual({ recipeId: 'A', multiplier: 1 })
     expect(store.assignments['2026-08-18']).toBeUndefined()
+    expect(store.extras).toEqual([{ recipeId: 'B', multiplier: 2 }])
+    expect(store.petTarget).toBe(1500)
+    expect(store.petSelection).toEqual([{ id: 'p1', name: 'wortel', weightG: 80 }])
+    expect(store.petFoods).toEqual([{ id: 'p1', name: 'wortel', weightG: 80 }])
   })
 
   it('recipeById getter resolves a recipe card by id', async () => {
@@ -173,5 +213,132 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     await store.loadAll()
     expect(store.recipeById('A')?.title).toBe('Macaroni')
     expect(store.recipeById('missing')).toBeUndefined()
+  })
+})
+
+describe('menu store — extras', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mocked.getShoppingList.mockResolvedValue({ items: [], pantry: [] })
+  })
+
+  it('addExtra() sets extras from the API response and refreshes the bag', async () => {
+    mocked.putExtra.mockResolvedValue({
+      days: [],
+      extras: [{ recipeId: 'bread', multiplier: 1 }],
+    })
+    const store = useMenuStore()
+    await store.addExtra('bread', 1)
+    expect(mocked.putExtra).toHaveBeenCalledWith('bread', 1)
+    expect(store.extras).toEqual([{ recipeId: 'bread', multiplier: 1 }])
+    expect(mocked.getShoppingList).toHaveBeenCalled()
+  })
+
+  it('setExtraMultiplier() updates the extra via putExtra', async () => {
+    mocked.putExtra.mockResolvedValue({
+      days: [],
+      extras: [{ recipeId: 'bread', multiplier: 2 }],
+    })
+    const store = useMenuStore()
+    store.extras = [{ recipeId: 'bread', multiplier: 1 }]
+    await store.setExtraMultiplier('bread', 2)
+    expect(mocked.putExtra).toHaveBeenCalledWith('bread', 2)
+    expect(store.extras).toEqual([{ recipeId: 'bread', multiplier: 2 }])
+  })
+
+  it('removeExtra() clears the extra from the API response', async () => {
+    mocked.deleteExtra.mockResolvedValue({ days: [], extras: [] })
+    const store = useMenuStore()
+    store.extras = [{ recipeId: 'bread', multiplier: 1 }]
+    await store.removeExtra('bread')
+    expect(mocked.deleteExtra).toHaveBeenCalledWith('bread')
+    expect(store.extras).toEqual([])
+    expect(mocked.getShoppingList).toHaveBeenCalled()
+  })
+})
+
+describe('menu store — pet', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mocked.getShoppingList.mockResolvedValue({ items: [], pantry: [] })
+  })
+
+  it('loadPet() fills target and selection', async () => {
+    mocked.getPet.mockResolvedValue({
+      targetG: 1250,
+      selection: [{ id: 'p1', name: 'paprika', weightG: 150 }],
+    })
+    const store = useMenuStore()
+    await store.loadPet()
+    expect(store.petTarget).toBe(1250)
+    expect(store.petSelection).toEqual([{ id: 'p1', name: 'paprika', weightG: 150 }])
+  })
+
+  it('regeneratePet() updates target + selection and refreshes the bag', async () => {
+    mocked.regeneratePet.mockResolvedValue({
+      targetG: 1000,
+      selection: [{ id: 'p2', name: 'komkommer', weightG: 400 }],
+    })
+    const store = useMenuStore()
+    await store.regeneratePet()
+    expect(mocked.regeneratePet).toHaveBeenCalled()
+    expect(store.petTarget).toBe(1000)
+    expect(store.petSelection).toEqual([{ id: 'p2', name: 'komkommer', weightG: 400 }])
+    expect(mocked.getShoppingList).toHaveBeenCalled()
+  })
+
+  it('setPetTarget() updates target + selection', async () => {
+    mocked.setPetTarget.mockResolvedValue({
+      targetG: 1500,
+      selection: [{ id: 'p3', name: 'wortel', weightG: 80 }],
+    })
+    const store = useMenuStore()
+    await store.setPetTarget(1500)
+    expect(mocked.setPetTarget).toHaveBeenCalledWith(1500)
+    expect(store.petTarget).toBe(1500)
+    expect(store.petSelection).toEqual([{ id: 'p3', name: 'wortel', weightG: 80 }])
+    expect(mocked.getShoppingList).toHaveBeenCalled()
+  })
+
+  it('replacePetFood() swaps and updates the selection', async () => {
+    mocked.replacePetFood.mockResolvedValue({
+      targetG: 1000,
+      selection: [{ id: 'p4', name: 'andijvie', weightG: 300 }],
+    })
+    const store = useMenuStore()
+    await store.replacePetFood('paprika')
+    expect(mocked.replacePetFood).toHaveBeenCalledWith('paprika')
+    expect(store.petSelection).toEqual([{ id: 'p4', name: 'andijvie', weightG: 300 }])
+    expect(mocked.getShoppingList).toHaveBeenCalled()
+  })
+
+  it('loadPetFoods() fills the editable food list', async () => {
+    mocked.listPetFoods.mockResolvedValue([{ id: 'p1', name: 'paprika', weightG: 150 }])
+    const store = useMenuStore()
+    await store.loadPetFoods()
+    expect(store.petFoods).toEqual([{ id: 'p1', name: 'paprika', weightG: 150 }])
+  })
+
+  it('addPetFood() appends via the API then reloads the list', async () => {
+    mocked.addPetFood.mockResolvedValue({ id: 'p9', name: 'sla', weightG: 400 })
+    mocked.listPetFoods.mockResolvedValue([{ id: 'p9', name: 'sla', weightG: 400 }])
+    const store = useMenuStore()
+    await store.addPetFood('sla', 400)
+    expect(mocked.addPetFood).toHaveBeenCalledWith('sla', 400)
+    expect(store.petFoods).toEqual([{ id: 'p9', name: 'sla', weightG: 400 }])
+  })
+
+  it('deletePetFood() updates the list from the API response', async () => {
+    mocked.deletePetFood.mockResolvedValue([{ id: 'p1', name: 'paprika', weightG: 150 }])
+    const store = useMenuStore()
+    store.petFoods = [
+      { id: 'p1', name: 'paprika', weightG: 150 },
+      { id: 'p2', name: 'sla', weightG: 400 },
+    ]
+    await store.deletePetFood('p2')
+    expect(mocked.deletePetFood).toHaveBeenCalledWith('p2')
+    expect(store.petFoods).toEqual([{ id: 'p1', name: 'paprika', weightG: 150 }])
   })
 })

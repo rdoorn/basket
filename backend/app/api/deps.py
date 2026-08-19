@@ -10,10 +10,12 @@ from typing import Any
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.adapters.db.mongo_menu_repo import MongoMenuRepo
+from app.adapters.db.mongo_pet_food_repo import MongoPetFoodRepo
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
 from app.adapters.pricing.mock_provider import MockPricingProvider
 from app.config import get_settings
 from app.ports.menu_repo import MenuRepo
+from app.ports.pet_food_repo import PetFoodRepo
 from app.ports.pricing_provider import PricingProvider
 from app.ports.recipe_repo import RecipeRepo
 
@@ -38,6 +40,11 @@ def get_recipe_repo() -> RecipeRepo:
 def get_menu_repo() -> MenuRepo:
     """Return the menu repository bound to the shared database."""
     return MongoMenuRepo(get_database())
+
+
+def get_pet_food_repo() -> PetFoodRepo:
+    """Return the pet-food repository bound to the shared database."""
+    return MongoPetFoodRepo(get_database())
 
 
 def get_pricing_providers() -> list[PricingProvider]:

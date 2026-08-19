@@ -4,6 +4,7 @@ from mongomock_motor import AsyncMongoMockClient
 
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
 from app.seed import (
+    build_dierbroodjes,
     build_salade_garnalen,
     build_salade_kip_pesto,
     build_seed_recipe,
@@ -60,9 +61,9 @@ def test_seed_recipe_has_expected_groups():
 
 def test_all_seed_recipes_are_valid_and_uniquely_ided():
     recipes = seed_recipes()
-    assert len(recipes) == 4
+    assert len(recipes) == 5
     ids = [r.id for r in recipes]
-    assert len(set(ids)) == 4  # no duplicate ids
+    assert len(set(ids)) == 5  # no duplicate ids
     for recipe in recipes:
         assert recipe.title
         assert recipe.icon
@@ -88,15 +89,41 @@ def test_new_recipe_builders_core_facts():
     assert any(i.name == "pesto" for i in kip.ingredients)
 
 
+def test_dierbroodjes_core_facts():
+    recipe = build_dierbroodjes()
+    assert recipe.id == "zachte-dierbroodjes"
+    assert recipe.category == "bake"
+    assert recipe.icon == "🍞"
+    assert recipe.servings == 8
+    assert len(recipe.steps) >= 10
+    phases = {step.phase for step in recipe.steps}
+    assert len(phases) >= 2  # steps span multiple phases
+    by_name = _ingredients_by_name(recipe)
+    assert by_name["broodmeel"].quantity == 310
+    assert by_name["broodmeel"].unit == "g"
+    groups = {ing.group for ing in recipe.ingredients}
+    assert {"Deeg", "Decoratie", "Glans"} <= groups
+    # Elaborate, non-summarized steps.
+    assert all(len(step.instructions) > 20 for step in recipe.steps)
+
+
+def test_all_seed_recipes_now_five_unique():
+    recipes = seed_recipes()
+    assert len(recipes) == 5
+    ids = [r.id for r in recipes]
+    assert len(set(ids)) == 5
+    assert "zachte-dierbroodjes" in ids
+
+
 @pytest.mark.asyncio
 async def test_seed_missing_inserts_all_and_is_idempotent():
     db = AsyncMongoMockClient()["basket_test"]
     repo = MongoRecipeRepo(db)
     assert await repo.count() == 0
     await seed_missing(repo)
-    assert await repo.count() == 4
+    assert await repo.count() == 5
     await seed_missing(repo)  # idempotent — no duplicates
-    assert await repo.count() == 4
+    assert await repo.count() == 5
 
 
 @pytest.mark.asyncio
@@ -106,4 +133,4 @@ async def test_seed_missing_adds_only_new_recipes():
     await repo.create(build_seed_recipe())  # macaroni already present
     assert await repo.count() == 1
     await seed_missing(repo)
-    assert await repo.count() == 4  # the three new ones got added
+    assert await repo.count() == 5  # the four new ones got added
