@@ -36,14 +36,19 @@ De poorten zijn bewust niet-standaard gekozen. Bij de eerste start seedt de API 
 - **Porties** — per dag een vermenigvuldiger (0.5× / 1× / 1.5× / 2× of eigen waarde),
   altijd t.o.v. het aantal personen waarvoor het recept beschreven is.
 - **Boodschappenlijst** — automatisch afgeleid uit het menu, geaggregeerd en geschaald.
+- **Heb ik vast wel** — een bewerkbare lijst (eigen pagina) met dingen die je meestal in huis
+  hebt (olie, zout, kruiden, suiker, gist…). Deze komen niet standaard op de boodschappen; met
+  één klik verplaats je een item alsnog naar de lijst (of terug).
 - **Recepten** — toevoegen, bewerken, verwijderen (maaltijd of 🍞 baksel); en een
   leesweergave met icoon, volledige ingrediëntenlijst, kooktijd-overzicht (prep vs. actief
   koken) en de uitgebreide stappen.
 - **Extra's** — sleep een recept (bijv. een baksel) naar de Extra's-zone naast de kalender
   om het zonder dag aan de boodschappen toe te voegen, met eigen ×-portie.
-- **Huisdiervoer** — een bewerkbare lijst van wat je huisdier lust (met een geschat gewicht
-  per stuk). De app vult automatisch tot een wekelijks streefgewicht (± ¼ kg, standaard
-  ~1 kg): de goedkoopste + willekeurige items. Elk item is te vervangen (↻) of te
+- **Huisdiervoer** — een bewerkbare lijst (eigen pagina) van wat je huisdier lust, met een
+  geschat gewicht per stuk voor als de winkel het niet vermeldt. De app vult automatisch tot
+  een wekelijks streefgewicht (± ¼ kg, standaard ~1 kg): de goedkoopste + willekeurige items.
+  Ingrediënten die je toch al voor een recept koopt (bijv. ijsbergsla) tellen voor 50% van hun
+  gewicht mee als restjes en worden niet dubbel besteld. Elk item is te vervangen (↻) of te
   regenereren; de selectie komt in de boodschappen en telt mee in de prijs.
 - **Kopen** — overzicht met per supermarkt de prijs per ingrediënt en het totaal, de
   goedkoopste uitgelicht (nu via de mock-prijsbron).

@@ -98,3 +98,66 @@ def test_adjust_shrink_to_zero_keeps_anchor():
     selection = pet_service.generate(FOODS, PRICES, 100000, random.Random(0))
     result = pet_service.adjust(selection, FOODS, PRICES, 0, random.Random(0))
     assert result == ["wortel"]  # anchor always survives
+
+
+def test_coverage_g_is_half_standard_weight_of_overlaps():
+    foods = [
+        PetFood(id="i", name="ijsbergsla", weight_g=400),
+        PetFood(id="p", name="paprika", weight_g=150),
+    ]
+    assert pet_service.coverage_g(foods, {"ijsbergsla"}) == 200
+    # Multiple overlaps sum; rounding applies per food.
+    assert pet_service.coverage_g(foods, {"ijsbergsla", "paprika"}) == 275
+    # No overlap -> zero.
+    assert pet_service.coverage_g(foods, set()) == 0
+
+
+def test_generate_excludes_overlap_and_fills_effective_target():
+    # target 1000, ijsbergsla overlaps -> covered 200 -> effective 800; the
+    # pool excludes ijsbergsla so it never appears in the selection.
+    selection = pet_service.generate(
+        FOODS, PRICES, 1000, random.Random(0), exclude_names={"ijsbergsla"}
+    )
+    assert "ijsbergsla" not in selection
+    assert selection[0] == "wortel"  # cheapest of the pool anchors
+    assert _weight(selection) >= 800  # reaches the effective target
+    # Penultimate total is below the effective target (fill stops as soon as
+    # it is reached).
+    assert _weight(selection[:-1]) < 800
+
+
+def test_generate_empty_pool_returns_empty():
+    foods = [PetFood(id="i", name="ijsbergsla", weight_g=400)]
+    selection = pet_service.generate(
+        foods, {"ijsbergsla": 0.8}, 1000, random.Random(0),
+        exclude_names={"ijsbergsla"},
+    )
+    assert selection == []
+
+
+def test_adjust_respects_exclude_and_coverage():
+    # Selection already holds an excluded food; adjust must drop it and reach
+    # only the effective target using the pool.
+    selection = ["ijsbergsla", "wortel"]
+    result = pet_service.adjust(
+        selection, FOODS, PRICES, 1000, random.Random(0),
+        exclude_names={"ijsbergsla"},
+    )
+    assert "ijsbergsla" not in result
+    assert result[0] == "wortel"  # cheapest of the pool kept as anchor
+    assert _weight(result) >= 800  # effective target (1000 - 200 covered)
+
+
+def test_adjust_shrinks_to_effective_target_with_exclude():
+    # A full-pool selection shrunk toward a small target still excludes the
+    # overlap and keeps the anchor.
+    selection = pet_service.generate(
+        FOODS, PRICES, 100000, random.Random(0), exclude_names={"ijsbergsla"}
+    )
+    result = pet_service.adjust(
+        selection, FOODS, PRICES, 300, random.Random(0),
+        exclude_names={"ijsbergsla"},
+    )
+    assert "ijsbergsla" not in result
+    assert result[0] == "wortel"
+    assert _weight(result) >= 100  # effective target (300 - 200 covered)

@@ -8,7 +8,7 @@ from mongomock_motor import AsyncMongoMockClient
 
 from app.adapters.db.mongo_pet_food_repo import MongoPetFoodRepo
 from app.domain.pet import PetFood
-from app.seed import PET_FOOD_SEED, seed_pet_foods_if_empty
+from app.seed import PET_FOOD_SEED, seed_pet_foods_missing
 
 
 def _db():
@@ -45,12 +45,28 @@ async def test_pet_food_count():
 
 
 @pytest.mark.asyncio
-async def test_seed_pet_foods_if_empty_is_idempotent():
+async def test_seed_pet_foods_missing_is_idempotent():
     repo = MongoPetFoodRepo(_db())
-    await seed_pet_foods_if_empty(repo)
+    await seed_pet_foods_missing(repo)
     assert await repo.count() == len(PET_FOOD_SEED)
-    await seed_pet_foods_if_empty(repo)  # idempotent — no duplicates
+    await seed_pet_foods_missing(repo)  # idempotent — no duplicates
     assert await repo.count() == len(PET_FOOD_SEED)
     names = {f.name for f in await repo.list()}
-    assert {"paprika", "komkommer", "ijsbergsla", "wortel",
-            "andijvie", "veldsla"} <= names
+    assert {"paprika", "komkommer", "ijsbergsla", "wortel", "andijvie",
+            "veldsla", "koolrabi", "mais (vers)", "witlof",
+            "babyromaine"} <= names
+
+
+@pytest.mark.asyncio
+async def test_seed_pet_foods_missing_adds_only_new_foods():
+    # A pre-existing collection (missing the newer starter foods) gains only the
+    # foods it lacks, and a user's own addition is preserved.
+    repo = MongoPetFoodRepo(_db())
+    await repo.create(PetFood(id="", name="paprika", weight_g=150))
+    await repo.create(PetFood(id="", name="eigen-groente", weight_g=99))
+    await seed_pet_foods_missing(repo)
+    names = {f.name for f in await repo.list()}
+    assert "koolrabi" in names          # new starter food added
+    assert "eigen-groente" in names     # user's own food preserved
+    # paprika not duplicated
+    assert sum(1 for f in await repo.list() if f.name == "paprika") == 1

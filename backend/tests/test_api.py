@@ -14,9 +14,19 @@ from mongomock_motor import AsyncMongoMockClient
 from app.adapters.db.mongo_menu_repo import MongoMenuRepo
 from app.adapters.db.mongo_pet_food_repo import MongoPetFoodRepo
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
-from app.api.deps import get_menu_repo, get_pet_food_repo, get_recipe_repo
+from app.adapters.db.mongo_staple_repo import MongoStapleRepo
+from app.api.deps import (
+    get_menu_repo,
+    get_pet_food_repo,
+    get_recipe_repo,
+    get_staple_repo,
+)
 from app.main import app
-from app.seed import seed_missing, seed_pet_foods_if_empty
+from app.seed import (
+    seed_missing,
+    seed_pet_foods_missing,
+    seed_staples_if_empty,
+)
 
 
 @pytest_asyncio.fixture
@@ -26,12 +36,15 @@ async def client():
     recipe_repo = MongoRecipeRepo(db)
     menu_repo = MongoMenuRepo(db)
     pet_food_repo = MongoPetFoodRepo(db)
+    staple_repo = MongoStapleRepo(db)
     await seed_missing(recipe_repo)
-    await seed_pet_foods_if_empty(pet_food_repo)
+    await seed_pet_foods_missing(pet_food_repo)
+    await seed_staples_if_empty(staple_repo)
 
     app.dependency_overrides[get_recipe_repo] = lambda: recipe_repo
     app.dependency_overrides[get_menu_repo] = lambda: menu_repo
     app.dependency_overrides[get_pet_food_repo] = lambda: pet_food_repo
+    app.dependency_overrides[get_staple_repo] = lambda: staple_repo
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -408,6 +421,34 @@ async def test_pet_replace_swaps_one(client):
 
 
 @pytest.mark.asyncio
+async def test_pet_get_reports_zero_coverage_without_overlap(client):
+    resp = await client.get("/pet")
+    assert resp.status_code == 200
+    assert resp.json()["coveredG"] == 0
+
+
+@pytest.mark.asyncio
+async def test_pet_excludes_recipe_overlap_and_reports_coverage(client):
+    # Plan the kip-pesto salad (uses ijsbergsla) then regenerate pet food.
+    await client.put(
+        "/weekmenu/assignments",
+        json={
+            "date": _today(),
+            "recipeId": "salade-kip-pesto",
+            "multiplier": 1.0,
+        },
+    )
+    pet = (await client.post("/pet/regenerate")).json()
+    assert pet["coveredG"] >= 1  # ijsbergsla contributes coverage
+    assert all(f["name"] != "ijsbergsla" for f in pet["selection"])
+    sl = (await client.get("/shopping-list")).json()
+    huis = [i["name"] for i in sl["items"] if i.get("group") == "Huisdiervoer"]
+    assert "ijsbergsla" not in huis  # not duplicated as pet food
+    # It is a normal shopping line.
+    assert any(i["name"] == "ijsbergsla" for i in sl["items"])
+
+
+@pytest.mark.asyncio
 async def test_deleting_selected_pet_food_scrubs_selection(client):
     # A deleted food must vanish from the selection AND the shopping bag, not
     # linger as a stale name that only the pricing/bag paths still surface.
@@ -424,3 +465,35 @@ async def test_deleting_selected_pet_food_scrubs_selection(client):
     items = (await client.get("/shopping-list")).json()["items"]
     pet_names = {i["name"] for i in items if i.get("group") == "Huisdiervoer"}
     assert victim["name"] not in pet_names
+
+
+# ---------------------------------------------------------------------------
+# Staples ("heb ik vast wel")
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_staples_crud(client):
+    base = await client.get("/staples")
+    assert base.status_code == 200
+    created = await client.post("/staples", json={"name": "Kaneel"})
+    assert created.status_code == 200 and created.json()["name"] == "kaneel"
+    sid = created.json()["id"]
+    assert any(s["id"] == sid for s in (await client.get("/staples")).json())
+    await client.delete(f"/staples/{sid}")
+    assert all(s["id"] != sid for s in (await client.get("/staples")).json())
+
+
+@pytest.mark.asyncio
+async def test_added_staple_moves_ingredient_to_pantry(client):
+    # Plan a day whose recipe uses 'passata' (normally bought), then mark
+    # passata a staple; it must move from the shopping list to the pantry.
+    rid = "macaroni-alla-siciliana"
+    await client.put(
+        "/weekmenu/assignments",
+        json={"date": _today(), "recipeId": rid, "multiplier": 1.0},
+    )
+    await client.post("/staples", json={"name": "passata"})
+    sl = (await client.get("/shopping-list")).json()
+    assert any(i["name"] == "passata" for i in sl["pantry"])
+    assert all(i["name"] != "passata" for i in sl["items"])

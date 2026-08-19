@@ -28,6 +28,20 @@ def _total_weight(names: list[str], foods: list[PetFood]) -> int:
     return sum(lookup[n].weight_g for n in names if n in lookup)
 
 
+def coverage_g(foods: list[PetFood], names: set[str]) -> int:
+    """Return the leftover coverage in grams for overlapping foods.
+
+    A pet food whose name is in ``names`` (a recipe overlap) is already bought
+    for the menu; half of its standard ``weight_g`` counts toward the weekly
+    target. Coverage is summed over all matching foods, rounded per food.
+
+    :param foods: the available pet foods.
+    :param names: normalized names that overlap with recipe ingredients.
+    :returns: total leftover coverage in grams (0 when nothing overlaps).
+    """
+    return sum(round(0.5 * f.weight_g) for f in foods if f.name in names)
+
+
 def cheapest(foods: list[PetFood], prices: dict[str, float]) -> PetFood:
     """Return the cheapest food by ``prices`` (ties broken by name).
 
@@ -67,19 +81,28 @@ def generate(
     prices: dict[str, float],
     target_g: int,
     rng: random.Random,
+    exclude_names: set[str] = frozenset(),
 ) -> list[str]:
     """Build a fresh selection: cheapest anchor, then random fill to weight.
+
+    Foods whose name is in ``exclude_names`` are recipe overlaps (leftovers
+    already feed them), so they are dropped from the pick pool and half their
+    standard weight counts toward the target via :func:`coverage_g`. The pool
+    is filled to the resulting *effective* target.
 
     :param foods: the available pet foods.
     :param prices: ``name -> price`` map used only to pick the anchor.
     :param target_g: weekly weight target in grams (a guide, not a hard cap).
     :param rng: injected RNG so tests are deterministic.
-    :returns: selected food names, anchor first; empty when ``foods`` is empty.
+    :param exclude_names: normalized names to exclude (recipe overlaps).
+    :returns: selected food names, anchor first; empty when the pool is empty.
     """
-    if not foods:
+    pool = [f for f in foods if f.name not in exclude_names]
+    if not pool:
         return []
-    selection = [cheapest(foods, prices).name]
-    return _fill(selection, foods, target_g, rng)
+    effective = max(0, target_g - coverage_g(foods, exclude_names))
+    selection = [cheapest(pool, prices).name]
+    return _fill(selection, pool, effective, rng)
 
 
 def replace(
@@ -111,31 +134,39 @@ def adjust(
     prices: dict[str, float],
     new_target_g: int,
     rng: random.Random,
+    exclude_names: set[str] = frozenset(),
 ) -> list[str]:
     """Re-approach ``new_target_g`` while keeping existing picks where possible.
 
-    Grow: append random unselected foods until the target is reached. Shrink:
-    drop trailing non-anchor picks while the total stays at or above the target,
+    Excluded names (recipe overlaps) are first dropped from ``selection`` and
+    never re-added; half their standard weight counts toward the target via
+    :func:`coverage_g`, so growth/shrink target the *effective* target. Grow:
+    append random unselected pool foods until it is reached. Shrink: drop
+    trailing non-anchor picks while the total stays at or above the target,
     always keeping the cheapest anchor at the front. Regenerates from scratch
-    when the current selection is empty.
-    """
-    if not foods:
-        return []
-    if not selection:
-        return generate(foods, prices, new_target_g, rng)
+    when the (filtered) selection is empty.
 
-    anchor = cheapest(foods, prices).name
-    result = list(selection)
+    :param exclude_names: normalized names to exclude (recipe overlaps).
+    """
+    pool = [f for f in foods if f.name not in exclude_names]
+    if not pool:
+        return []
+    effective = max(0, new_target_g - coverage_g(foods, exclude_names))
+    result = [n for n in selection if n not in exclude_names]
+    if not result:
+        return generate(foods, prices, new_target_g, rng, exclude_names)
+
+    anchor = cheapest(pool, prices).name
     # Ensure the anchor is present and leads the list so it is never dropped.
     if anchor in result:
         result.remove(anchor)
     result.insert(0, anchor)
 
-    if _total_weight(result, foods) < new_target_g:
-        return _fill(result, foods, new_target_g, rng)
+    if _total_weight(result, pool) < effective:
+        return _fill(result, pool, effective, rng)
 
     # Shrink: drop from the tail while staying at or above the target and never
     # removing the anchor (index 0).
-    while len(result) > 1 and _total_weight(result[:-1], foods) >= new_target_g:
+    while len(result) > 1 and _total_weight(result[:-1], pool) >= effective:
         result.pop()
     return result

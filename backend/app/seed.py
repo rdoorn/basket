@@ -7,10 +7,31 @@ empty (idempotent).
 """
 from app.domain.pet import PetFood
 from app.domain.recipe import Ingredient, Recipe, Step
+from app.domain.staple import Staple
+from app.domain.staples import normalize_name
 from app.ports.pet_food_repo import PetFoodRepo
 from app.ports.recipe_repo import RecipeRepo
+from app.ports.staple_repo import StapleRepo
 
 SEED_RECIPE_ID = "macaroni-alla-siciliana"
+
+# The "heb ik vast wel" starter list: the legacy hardcoded defaults plus the
+# bake staples (suiker, zwarte sesam, instant gist, basterdsuiker). Names are
+# normalized on create by the repo.
+STAPLE_SEED: list[str] = [
+    "olijfolie",
+    "citroensap",
+    "chilivlokken",
+    "gehakt",
+    "rundergehakt",
+    "zout",
+    "zwarte peper",
+    "venkelzaad",
+    "suiker",
+    "zwarte sesam",
+    "instant gist",
+    "basterdsuiker",
+]
 
 # Editable, cavia-friendly starter list. ``weight_g`` is a static guess of the
 # grams per purchase-unit used only as a guide by ``pet_service``.
@@ -21,6 +42,10 @@ PET_FOOD_SEED: list[PetFood] = [
     PetFood(id="wortel", name="wortel", weight_g=80),
     PetFood(id="andijvie", name="andijvie", weight_g=300),
     PetFood(id="veldsla", name="veldsla", weight_g=100),
+    PetFood(id="koolrabi", name="koolrabi", weight_g=300),
+    PetFood(id="mais-vers", name="mais (vers)", weight_g=250),
+    PetFood(id="witlof", name="witlof", weight_g=150),
+    PetFood(id="babyromaine", name="babyromaine", weight_g=200),
 ]
 
 
@@ -693,10 +718,10 @@ def build_dierbroodjes() -> Recipe:
         # Glans
         Ingredient(
             group="Glans",
-            name="melk óf losgeklopt ei",
+            name="melk",
             quantity=None,
             unit=None,
-            note="dun bestrijken voor glans, optioneel",
+            note="dun laagje, optioneel",
         ),
     ]
 
@@ -907,13 +932,26 @@ async def seed_missing(repo: RecipeRepo) -> None:
             await repo.create(recipe)
 
 
-async def seed_pet_foods_if_empty(repo: PetFoodRepo) -> None:
-    """Insert the pet-food starter list once when the collection is empty.
+async def seed_pet_foods_missing(repo: PetFoodRepo) -> None:
+    """Insert any starter pet food not already present (idempotent, by name).
 
-    Idempotent: seeds only when no pet foods exist yet, so a user's edits to
-    the list are never overwritten on a later start.
+    Seeds by normalized name so newly added starter foods appear on a later
+    start even when the collection already holds earlier ones. Existing foods
+    (and a user's own additions) are left untouched.
+    """
+    existing = {normalize_name(food.name) for food in await repo.list()}
+    for food in PET_FOOD_SEED:
+        if normalize_name(food.name) not in existing:
+            await repo.create(food)
+
+
+async def seed_staples_if_empty(repo: StapleRepo) -> None:
+    """Insert the "heb ik vast wel" starter list once when it is empty.
+
+    Idempotent: seeds only when no staples exist yet, so a user's edits to the
+    list are never overwritten on a later start. The repo normalizes each name.
     """
     if await repo.count() > 0:
         return
-    for food in PET_FOOD_SEED:
-        await repo.create(food)
+    for name in STAPLE_SEED:
+        await repo.create(Staple(id="", name=name))

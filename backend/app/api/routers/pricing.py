@@ -5,11 +5,17 @@ providers via ``pricing_service``.
 """
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_menu_repo, get_pricing_providers, get_recipe_repo
+from app.api.deps import (
+    get_menu_repo,
+    get_pricing_providers,
+    get_recipe_repo,
+    get_staple_repo,
+)
 from app.api.schemas.pricing import PricingOut
 from app.ports.menu_repo import MenuRepo
 from app.ports.pricing_provider import PricingProvider
 from app.ports.recipe_repo import RecipeRepo
+from app.ports.staple_repo import StapleRepo
 from app.services import pricing_service, shopping_service
 
 router = APIRouter(prefix="/pricing", tags=["pricing"])
@@ -19,12 +25,14 @@ router = APIRouter(prefix="/pricing", tags=["pricing"])
 async def quote(
     menu_repo: MenuRepo = Depends(get_menu_repo),
     recipe_repo: RecipeRepo = Depends(get_recipe_repo),
+    staple_repo: StapleRepo = Depends(get_staple_repo),
     providers: list[PricingProvider] = Depends(get_pricing_providers),
 ) -> PricingOut:
     """Return per-store quotes for the current shopping list."""
     menu = await menu_repo.load()
     recipes = await recipe_repo.list()
     recipes_by_id = {recipe.id: recipe for recipe in recipes}
-    breakdown = shopping_service.build_breakdown(menu, recipes_by_id)
+    staples = {s.name for s in await staple_repo.list()}
+    breakdown = shopping_service.build_breakdown(menu, recipes_by_id, staples)
     quotes = pricing_service.quote_all(breakdown.items, providers)
     return PricingOut.from_quotes(quotes)

@@ -4,6 +4,7 @@ from mongomock_motor import AsyncMongoMockClient
 
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
 from app.seed import (
+    PET_FOOD_SEED,
     build_dierbroodjes,
     build_salade_garnalen,
     build_salade_kip_pesto,
@@ -113,6 +114,26 @@ def test_all_seed_recipes_now_five_unique():
     ids = [r.id for r in recipes]
     assert len(set(ids)) == 5
     assert "zachte-dierbroodjes" in ids
+
+
+def test_pet_food_seed_includes_new_foods_with_positive_weight():
+    by_name = {food.name: food for food in PET_FOOD_SEED}
+    for name in ("koolrabi", "mais (vers)", "witlof", "babyromaine"):
+        assert name in by_name
+        assert by_name[name].weight_g > 0
+    assert by_name["koolrabi"].weight_g == 300
+    assert by_name["mais (vers)"].weight_g == 250
+    assert by_name["witlof"].weight_g == 150
+    assert by_name["babyromaine"].weight_g == 200
+
+
+def test_dierbroodjes_glaze_is_plain_melk():
+    recipe = build_dierbroodjes()
+    glaze = [ing for ing in recipe.ingredients if ing.group == "Glans"]
+    assert len(glaze) == 1
+    assert glaze[0].name == "melk"
+    # No egg-based glaze remains in the Glans group.
+    assert all("ei" not in ing.name for ing in glaze)
 
 
 @pytest.mark.asyncio

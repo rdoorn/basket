@@ -12,12 +12,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.adapters.db.mongo_menu_repo import MongoMenuRepo
 from app.adapters.db.mongo_pet_food_repo import MongoPetFoodRepo
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
+from app.adapters.db.mongo_staple_repo import MongoStapleRepo
 from app.adapters.pricing.mock_provider import MockPricingProvider
 from app.config import get_settings
 from app.ports.menu_repo import MenuRepo
 from app.ports.pet_food_repo import PetFoodRepo
 from app.ports.pricing_provider import PricingProvider
 from app.ports.recipe_repo import RecipeRepo
+from app.ports.staple_repo import StapleRepo
 
 
 @lru_cache(maxsize=1)
@@ -45,6 +47,11 @@ def get_menu_repo() -> MenuRepo:
 def get_pet_food_repo() -> PetFoodRepo:
     """Return the pet-food repository bound to the shared database."""
     return MongoPetFoodRepo(get_database())
+
+
+def get_staple_repo() -> StapleRepo:
+    """Return the staple repository bound to the shared database."""
+    return MongoStapleRepo(get_database())
 
 
 def get_pricing_providers() -> list[PricingProvider]:

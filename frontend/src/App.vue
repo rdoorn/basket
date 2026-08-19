@@ -9,6 +9,8 @@ import { RouterLink, RouterView } from 'vue-router'
       <nav class="app-nav">
         <RouterLink to="/">Kalender</RouterLink>
         <RouterLink to="/buy">Kopen</RouterLink>
+        <RouterLink to="/staples">Heb ik vast wel</RouterLink>
+        <RouterLink to="/pet-foods">Huisdiervoer</RouterLink>
         <RouterLink to="/recipe/new">Recept toevoegen</RouterLink>
       </nav>
     </header>

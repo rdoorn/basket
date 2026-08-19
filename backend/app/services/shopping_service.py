@@ -72,6 +72,7 @@ def build_shopping_list(
 def partition_items(
     items: list[ShoppingListItem],
     item_choices: dict[str, bool],
+    staples: set[str],
 ) -> ShoppingBreakdown:
     """Split ``items`` into a shopping list and a "heb ik vast wel" list.
 
@@ -81,12 +82,13 @@ def partition_items(
 
     :param items: aggregated shopping-list lines.
     :param item_choices: normalized name -> buy? overrides.
+    :param staples: normalized staple names (from the ``staples`` collection).
     :returns: the split :class:`ShoppingBreakdown`.
     """
     to_buy: list[ShoppingListItem] = []
     pantry: list[ShoppingListItem] = []
     for item in items:
-        staple = is_staple(item.name)
+        staple = is_staple(item.name, staples)
         buy = item_choices.get(normalize_name(item.name), not staple)
         flagged = item.model_copy(update={"staple": staple})
         (to_buy if buy else pantry).append(flagged)
@@ -109,14 +111,26 @@ def pet_items(pet_selection: list[str]) -> list[ShoppingListItem]:
 def build_breakdown(
     menu: WeekMenu,
     recipes_by_id: dict[str, Recipe],
+    staples: set[str],
 ) -> ShoppingBreakdown:
     """Build the aggregated shopping list split into to-buy and pantry lists.
 
     Recipe-derived items are aggregated and split by the pantry policy; the
     pet-food selection is appended to the buyable ``items`` under the
     "Huisdiervoer" group and never participates in the staple split.
+
+    :param staples: normalized staple names (from the ``staples`` collection).
     """
     items = build_shopping_list(menu, recipes_by_id)
-    breakdown = partition_items(items, menu.item_choices)
-    breakdown.items.extend(pet_items(menu.pet_selection))
+    breakdown = partition_items(items, menu.item_choices, staples)
+    # Suppress a pet line whose normalized name is already a recipe item: the
+    # recipe (Boodschappen) line wins so an overlap is never double-listed,
+    # even when ``pet_selection`` is stale (design section 2, dedup).
+    recipe_names = {normalize_name(item.name) for item in items}
+    surviving = [
+        name
+        for name in menu.pet_selection
+        if normalize_name(name) not in recipe_names
+    ]
+    breakdown.items.extend(pet_items(surviving))
     return breakdown

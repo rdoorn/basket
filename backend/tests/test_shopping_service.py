@@ -8,6 +8,16 @@ from app.services.shopping_service import (
     partition_items,
 )
 
+# Staple set as the repo would supply it (names already normalized).
+STAPLES = {
+    "gehakt",
+    "olijfolie",
+    "citroensap",
+    "zout",
+    "zwarte peper",
+    "suiker",
+}
+
 
 def _recipe():
     return Recipe(
@@ -150,7 +160,8 @@ def _shopping_items() -> list[ShoppingListItem]:
 
 
 def test_partition_defaults_staples_to_pantry_and_flags_them():
-    breakdown = partition_items(_shopping_items(), item_choices={})
+    breakdown = partition_items(_shopping_items(), item_choices={},
+                                staples=STAPLES)
     buy = {i.name for i in breakdown.items}
     pantry = {i.name for i in breakdown.pantry}
     assert buy == {"macaroni"}
@@ -159,7 +170,8 @@ def test_partition_defaults_staples_to_pantry_and_flags_them():
 
 
 def test_partition_promotes_named_staple_into_items():
-    breakdown = partition_items(_shopping_items(), item_choices={"gehakt": True})
+    breakdown = partition_items(_shopping_items(),
+                                item_choices={"gehakt": True}, staples=STAPLES)
     buy = {i.name for i in breakdown.items}
     pantry = {i.name for i in breakdown.pantry}
     assert "gehakt" in buy
@@ -171,14 +183,15 @@ def test_partition_promotes_named_staple_into_items():
 def test_partition_demotes_named_non_staple_into_pantry():
     # A non-staple (spare paprika) can be moved to "heb ik vast wel".
     items = [ShoppingListItem(name="rode paprika", quantity=1, unit="stuk")]
-    breakdown = partition_items(items, item_choices={"rode paprika": False})
+    breakdown = partition_items(items, item_choices={"rode paprika": False},
+                                staples=STAPLES)
     assert [i.name for i in breakdown.pantry] == ["rode paprika"]
     assert breakdown.items == []
 
 
 def test_partition_matches_choices_case_insensitively():
     items = [ShoppingListItem(name="Zwarte Peper", quantity=None, unit=None)]
-    breakdown = partition_items(items, item_choices={})
+    breakdown = partition_items(items, item_choices={}, staples=STAPLES)
     assert [i.name for i in breakdown.pantry] == ["Zwarte Peper"]
 
 
@@ -188,7 +201,7 @@ PET_GROUP = "Huisdiervoer"
 def test_build_breakdown_appends_pet_selection_to_items():
     menu = WeekMenu()
     menu.pet_selection = ["wortel", "paprika"]
-    breakdown = build_breakdown(menu, {})
+    breakdown = build_breakdown(menu, {}, staples=STAPLES)
     pet = [i for i in breakdown.items if i.group == PET_GROUP]
     assert {i.name for i in pet} == {"wortel", "paprika"}
     for item in pet:
@@ -200,8 +213,29 @@ def test_build_breakdown_appends_pet_selection_to_items():
 def test_pet_items_never_land_in_pantry():
     menu = WeekMenu()
     menu.pet_selection = ["wortel"]
-    breakdown = build_breakdown(menu, {})
+    breakdown = build_breakdown(menu, {}, staples=STAPLES)
     assert all(i.group != PET_GROUP for i in breakdown.pantry)
+
+
+def test_build_breakdown_dedups_pet_line_matching_recipe_item():
+    # A pet-selection entry whose normalized name equals a recipe item must not
+    # be duplicated under Huisdiervoer — the recipe line wins.
+    recipe = Recipe(
+        id="P", title="t", icon="🥗", description="", servings=2,
+        total_time_min_low=None, total_time_min_high=None, tags=[], notes=None,
+        ingredients=[Ingredient(name="ijsbergsla", quantity=1, unit="krop")],
+        steps=[],
+    )
+    menu = WeekMenu()
+    menu.set("d1", DayAssignment(recipe_id="P", multiplier=1.0))
+    menu.pet_selection = ["ijsbergsla", "wortel"]
+    breakdown = build_breakdown(menu, {"P": recipe}, staples=STAPLES)
+    pet = [i.name for i in breakdown.items if i.group == PET_GROUP]
+    assert "ijsbergsla" not in pet  # suppressed as a pet line
+    assert "wortel" in pet  # non-overlap stays
+    # ijsbergsla is still present as the normal recipe line.
+    normal = [i.name for i in breakdown.items if i.group != PET_GROUP]
+    assert "ijsbergsla" in normal
 
 
 def test_build_breakdown_uses_menu_item_choices():
@@ -218,6 +252,6 @@ def test_build_breakdown_uses_menu_item_choices():
     menu.set("d1", DayAssignment(recipe_id="S", multiplier=1.0))
     menu.set_item_buy("gehakt", True)
     menu.set_item_buy("macaroni", False)
-    breakdown = build_breakdown(menu, {"S": recipe})
+    breakdown = build_breakdown(menu, {"S": recipe}, staples=STAPLES)
     assert {i.name for i in breakdown.items} == {"gehakt"}
     assert {i.name for i in breakdown.pantry} == {"macaroni"}

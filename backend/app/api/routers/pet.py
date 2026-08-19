@@ -20,6 +20,7 @@ from app.api.deps import (
     get_menu_repo,
     get_pet_food_repo,
     get_pricing_providers,
+    get_recipe_repo,
 )
 from app.api.schemas.pet import (
     PetFoodIn,
@@ -28,14 +29,33 @@ from app.api.schemas.pet import (
     PetReplaceIn,
     PetTargetIn,
 )
+from app.domain.menu import WeekMenu
 from app.domain.pet import PetFood
 from app.domain.shopping import ShoppingListItem
+from app.domain.staples import normalize_name
 from app.ports.menu_repo import MenuRepo
 from app.ports.pet_food_repo import PetFoodRepo
 from app.ports.pricing_provider import PricingProvider
-from app.services import pet_service
+from app.ports.recipe_repo import RecipeRepo
+from app.services import pet_service, shopping_service
 
 router = APIRouter(prefix="/pet", tags=["pet"])
+
+
+async def _recipe_overlap(
+    menu: WeekMenu, foods: list[PetFood], recipe_repo: RecipeRepo
+) -> set[str]:
+    """Return pet-food names that are also recipe ingredients for ``menu``.
+
+    Leftovers of these foods already feed the cavias, so they are excluded from
+    the dedicated selection and half their standard weight counts as coverage.
+    Matched by normalized name against the recipe-derived shopping list.
+    """
+    recipes = await recipe_repo.list()
+    recipes_by_id = {recipe.id: recipe for recipe in recipes}
+    recipe_items = shopping_service.build_shopping_list(menu, recipes_by_id)
+    recipe_names = {normalize_name(item.name) for item in recipe_items}
+    return {food.name for food in foods if food.name in recipe_names}
 
 
 def _price_map(
@@ -106,28 +126,38 @@ async def delete_food(
 async def get_pet(
     menu_repo: MenuRepo = Depends(get_menu_repo),
     food_repo: PetFoodRepo = Depends(get_pet_food_repo),
+    recipe_repo: RecipeRepo = Depends(get_recipe_repo),
 ) -> PetOut:
-    """Return the current weekly target and resolved food selection."""
+    """Return the current weekly target, resolved selection and coverage."""
     menu = await menu_repo.load()
     foods = await food_repo.list()
-    return PetOut.build(menu.pet_target_g, menu.pet_selection, foods)
+    overlap = await _recipe_overlap(menu, foods, recipe_repo)
+    covered_g = pet_service.coverage_g(foods, overlap)
+    return PetOut.build(
+        menu.pet_target_g, menu.pet_selection, foods, covered_g
+    )
 
 
 @router.post("/regenerate", response_model=PetOut)
 async def regenerate(
     menu_repo: MenuRepo = Depends(get_menu_repo),
     food_repo: PetFoodRepo = Depends(get_pet_food_repo),
+    recipe_repo: RecipeRepo = Depends(get_recipe_repo),
     providers: list[PricingProvider] = Depends(get_pricing_providers),
 ) -> PetOut:
     """Rebuild the selection from scratch for the current target."""
     menu = await menu_repo.load()
     foods = await food_repo.list()
+    overlap = await _recipe_overlap(menu, foods, recipe_repo)
     prices = _price_map(foods, providers)
     menu.pet_selection = pet_service.generate(
-        foods, prices, menu.pet_target_g, random.Random()
+        foods, prices, menu.pet_target_g, random.Random(), exclude_names=overlap
     )
     await menu_repo.save(menu)
-    return PetOut.build(menu.pet_target_g, menu.pet_selection, foods)
+    covered_g = pet_service.coverage_g(foods, overlap)
+    return PetOut.build(
+        menu.pet_target_g, menu.pet_selection, foods, covered_g
+    )
 
 
 @router.put("/target", response_model=PetOut)
@@ -135,18 +165,24 @@ async def set_target(
     body: PetTargetIn,
     menu_repo: MenuRepo = Depends(get_menu_repo),
     food_repo: PetFoodRepo = Depends(get_pet_food_repo),
+    recipe_repo: RecipeRepo = Depends(get_recipe_repo),
     providers: list[PricingProvider] = Depends(get_pricing_providers),
 ) -> PetOut:
     """Set the weekly target (floored at 0) and re-approach it."""
     menu = await menu_repo.load()
     foods = await food_repo.list()
+    overlap = await _recipe_overlap(menu, foods, recipe_repo)
     prices = _price_map(foods, providers)
     menu.pet_target_g = max(0, body.target_g)
     menu.pet_selection = pet_service.adjust(
-        menu.pet_selection, foods, prices, menu.pet_target_g, random.Random()
+        menu.pet_selection, foods, prices, menu.pet_target_g,
+        random.Random(), exclude_names=overlap,
     )
     await menu_repo.save(menu)
-    return PetOut.build(menu.pet_target_g, menu.pet_selection, foods)
+    covered_g = pet_service.coverage_g(foods, overlap)
+    return PetOut.build(
+        menu.pet_target_g, menu.pet_selection, foods, covered_g
+    )
 
 
 @router.post("/replace", response_model=PetOut)
@@ -154,12 +190,22 @@ async def replace(
     body: PetReplaceIn,
     menu_repo: MenuRepo = Depends(get_menu_repo),
     food_repo: PetFoodRepo = Depends(get_pet_food_repo),
+    recipe_repo: RecipeRepo = Depends(get_recipe_repo),
 ) -> PetOut:
-    """Re-roll a single selected food for a random unselected one (1:1)."""
+    """Re-roll a single selected food for a random unselected one (1:1).
+
+    The candidate pool excludes recipe overlaps so a re-roll never lands on a
+    food that is already bought for the menu.
+    """
     menu = await menu_repo.load()
     foods = await food_repo.list()
+    overlap = await _recipe_overlap(menu, foods, recipe_repo)
+    pool = [food for food in foods if food.name not in overlap]
     menu.pet_selection = pet_service.replace(
-        menu.pet_selection, foods, body.name, random.Random()
+        menu.pet_selection, pool, body.name, random.Random()
     )
     await menu_repo.save(menu)
-    return PetOut.build(menu.pet_target_g, menu.pet_selection, foods)
+    covered_g = pet_service.coverage_g(foods, overlap)
+    return PetOut.build(
+        menu.pet_target_g, menu.pet_selection, foods, covered_g
+    )

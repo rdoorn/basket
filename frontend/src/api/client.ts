@@ -90,6 +90,14 @@ export interface PetFood {
 export interface Pet {
   targetG: number
   selection: PetFood[]
+  // Grams already covered by recipe leftovers.
+  coveredG: number
+}
+
+// An editable "heb ik vast wel" staple.
+export interface Staple {
+  id: string
+  name: string
 }
 
 export interface AssignmentsResponse {
@@ -265,6 +273,25 @@ export function replacePetFood(name: string): Promise<Pet> {
 }
 
 // ---------------------------------------------------------------------------
+// Staples ("heb ik vast wel") endpoints.
+// ---------------------------------------------------------------------------
+
+export function listStaples(): Promise<Staple[]> {
+  return request<Staple[]>('/staples')
+}
+
+export function addStaple(name: string): Promise<Staple> {
+  return request<Staple>('/staples', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function deleteStaple(id: string): Promise<Staple[]> {
+  return request<Staple[]>(`/staples/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
 // Shopping list + pricing.
 // ---------------------------------------------------------------------------
 
@@ -306,6 +333,9 @@ export const api = {
   setPetTarget,
   regeneratePet,
   replacePetFood,
+  listStaples,
+  addStaple,
+  deleteStaple,
 }
 
 export type Api = typeof api

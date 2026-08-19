@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useMenuStore } from '../stores/menu'
-import PetFoodEditor from './PetFoodEditor.vue'
 
 const store = useMenuStore()
-const showEditor = ref(false)
 
 const targetKg = computed(() => (store.petTarget / 1000).toFixed(2))
 
@@ -29,6 +28,9 @@ function onReplace(name: string): void {
 <template>
   <aside class="pet">
     <h2>Huisdiervoer ≈ {{ targetKg }} kg</h2>
+    <p v-if="store.petCovered > 0" class="covered">
+      ~{{ store.petCovered }} g uit restjes
+    </p>
 
     <div class="controls">
       <button type="button" @click="decreaseTarget">−250 g</button>
@@ -53,10 +55,7 @@ function onReplace(name: string): void {
       </li>
     </ul>
 
-    <button type="button" class="toggle" @click="showEditor = !showEditor">
-      {{ showEditor ? 'Verberg voerlijst' : 'Bewerk voerlijst' }}
-    </button>
-    <PetFoodEditor v-if="showEditor" />
+    <RouterLink to="/pet-foods" class="edit-link">Bewerk voerlijst</RouterLink>
   </aside>
 </template>
 
@@ -70,8 +69,14 @@ function onReplace(name: string): void {
 }
 
 .pet h2 {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.2rem;
   font-size: 1rem;
+}
+
+.covered {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .controls {
@@ -120,9 +125,9 @@ li {
   line-height: 1.3;
 }
 
-.toggle {
+.edit-link {
+  display: inline-block;
   margin-top: 0.6rem;
-  padding: 0.2rem 0.5rem;
   font-size: 0.8rem;
 }
 </style>

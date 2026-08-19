@@ -15,11 +15,15 @@ import {
   setPetTarget,
   regeneratePet,
   replacePetFood,
+  listStaples,
+  addStaple,
+  deleteStaple,
   type Assignment,
   type Extra,
   type PetFood,
   type RecipeCard,
   type ShoppingItem,
+  type Staple,
   type WeekMenuDay,
 } from '../api/client'
 
@@ -40,6 +44,10 @@ interface MenuState {
   petSelection: PetFood[]
   // Editable master list of pet foods.
   petFoods: PetFood[]
+  // Grams of the pet target already covered by recipe leftovers.
+  petCovered: number
+  // Editable "heb ik vast wel" staples.
+  staples: Staple[]
   loading: boolean
   lastSavedAt: string | null
 }
@@ -55,6 +63,8 @@ export const useMenuStore = defineStore('menu', {
     petTarget: 1000,
     petSelection: [],
     petFoods: [],
+    petCovered: 0,
+    staples: [],
     loading: false,
     lastSavedAt: null,
   }),
@@ -71,18 +81,21 @@ export const useMenuStore = defineStore('menu', {
     async loadAll(): Promise<void> {
       this.loading = true
       try {
-        const [recipes, menu, pet, petFoods] = await Promise.all([
+        const [recipes, menu, pet, petFoods, staples] = await Promise.all([
           listRecipes(),
           getWeekMenu(),
           getPet(),
           listPetFoods(),
+          listStaples(),
         ])
         this.recipes = recipes
         this.setDaysFromMenu(menu.days)
         this.extras = menu.extras ?? []
         this.petTarget = pet.targetG
         this.petSelection = pet.selection
+        this.petCovered = pet.coveredG ?? 0
         this.petFoods = petFoods
+        this.staples = staples
         await this.refreshShoppingList()
       } finally {
         this.loading = false
@@ -188,6 +201,7 @@ export const useMenuStore = defineStore('menu', {
       const pet = await getPet()
       this.petTarget = pet.targetG
       this.petSelection = pet.selection
+      this.petCovered = pet.coveredG ?? 0
     },
 
     // Rebuild the pet selection from scratch and refresh the bag.
@@ -195,6 +209,7 @@ export const useMenuStore = defineStore('menu', {
       const pet = await regeneratePet()
       this.petTarget = pet.targetG
       this.petSelection = pet.selection
+      this.petCovered = pet.coveredG ?? 0
       await this.refreshShoppingList()
     },
 
@@ -203,6 +218,7 @@ export const useMenuStore = defineStore('menu', {
       const pet = await setPetTarget(targetG)
       this.petTarget = pet.targetG
       this.petSelection = pet.selection
+      this.petCovered = pet.coveredG ?? 0
       await this.refreshShoppingList()
     },
 
@@ -211,6 +227,7 @@ export const useMenuStore = defineStore('menu', {
       const pet = await replacePetFood(name)
       this.petTarget = pet.targetG
       this.petSelection = pet.selection
+      this.petCovered = pet.coveredG ?? 0
       await this.refreshShoppingList()
     },
 
@@ -228,6 +245,24 @@ export const useMenuStore = defineStore('menu', {
     // Remove a food from the master list (API returns the updated list).
     async deletePetFood(id: string): Promise<void> {
       this.petFoods = await deletePetFood(id)
+    },
+
+    // --- Staples ("heb ik vast wel") ------------------------------------
+
+    // Load the editable staples list.
+    async loadStaples(): Promise<void> {
+      this.staples = await listStaples()
+    },
+
+    // Add a staple (name normalized server-side), then reload the list.
+    async addStaple(name: string): Promise<void> {
+      await addStaple(name)
+      this.staples = await listStaples()
+    },
+
+    // Remove a staple (API returns the updated list).
+    async deleteStaple(id: string): Promise<void> {
+      this.staples = await deleteStaple(id)
     },
 
     async refreshShoppingList(): Promise<void> {

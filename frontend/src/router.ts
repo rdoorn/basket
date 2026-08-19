@@ -5,6 +5,16 @@ const routes: RouteRecordRaw[] = [
   { path: '/', name: 'calendar', component: CalendarView },
   { path: '/buy', name: 'buy', component: () => import('./views/BuyView.vue') },
   {
+    path: '/staples',
+    name: 'staples',
+    component: () => import('./views/StaplesView.vue'),
+  },
+  {
+    path: '/pet-foods',
+    name: 'pet-foods',
+    component: () => import('./views/PetFoodsView.vue'),
+  },
+  {
     path: '/recipe/new',
     name: 'recipe-new',
     component: () => import('./views/RecipeEditView.vue'),

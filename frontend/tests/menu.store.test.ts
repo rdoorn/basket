@@ -23,6 +23,9 @@ vi.mock('../src/api/client', async (importOriginal) => {
     setPetTarget: vi.fn(),
     regeneratePet: vi.fn(),
     replacePetFood: vi.fn(),
+    listStaples: vi.fn(),
+    addStaple: vi.fn(),
+    deleteStaple: vi.fn(),
   }
 })
 
@@ -42,6 +45,9 @@ const mocked = client as unknown as {
   setPetTarget: ReturnType<typeof vi.fn>
   regeneratePet: ReturnType<typeof vi.fn>
   replacePetFood: ReturnType<typeof vi.fn>
+  listStaples: ReturnType<typeof vi.fn>
+  addStaple: ReturnType<typeof vi.fn>
+  deleteStaple: ReturnType<typeof vi.fn>
 }
 
 describe('menu store — optimistic move/swap/multiplier', () => {
@@ -58,10 +64,13 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     mocked.listPetFoods.mockResolvedValue([])
     mocked.addPetFood.mockResolvedValue({ id: 'x', name: 'x', weightG: 0 })
     mocked.deletePetFood.mockResolvedValue([])
-    mocked.getPet.mockResolvedValue({ targetG: 1000, selection: [] })
-    mocked.setPetTarget.mockResolvedValue({ targetG: 1000, selection: [] })
-    mocked.regeneratePet.mockResolvedValue({ targetG: 1000, selection: [] })
-    mocked.replacePetFood.mockResolvedValue({ targetG: 1000, selection: [] })
+    mocked.getPet.mockResolvedValue({ targetG: 1000, selection: [], coveredG: 0 })
+    mocked.setPetTarget.mockResolvedValue({ targetG: 1000, selection: [], coveredG: 0 })
+    mocked.regeneratePet.mockResolvedValue({ targetG: 1000, selection: [], coveredG: 0 })
+    mocked.replacePetFood.mockResolvedValue({ targetG: 1000, selection: [], coveredG: 0 })
+    mocked.listStaples.mockResolvedValue([])
+    mocked.addStaple.mockResolvedValue({ id: 's1', name: 'suiker' })
+    mocked.deleteStaple.mockResolvedValue([])
   })
 
   it('assign() sets an assignment on a day', async () => {
@@ -189,8 +198,10 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     mocked.getPet.mockResolvedValue({
       targetG: 1500,
       selection: [{ id: 'p1', name: 'wortel', weightG: 80 }],
+      coveredG: 120,
     })
     mocked.listPetFoods.mockResolvedValue([{ id: 'p1', name: 'wortel', weightG: 80 }])
+    mocked.listStaples.mockResolvedValue([{ id: 's1', name: 'suiker' }])
     const store = useMenuStore()
     await store.loadAll()
     expect(store.recipes).toHaveLength(1)
@@ -201,6 +212,8 @@ describe('menu store — optimistic move/swap/multiplier', () => {
     expect(store.petTarget).toBe(1500)
     expect(store.petSelection).toEqual([{ id: 'p1', name: 'wortel', weightG: 80 }])
     expect(store.petFoods).toEqual([{ id: 'p1', name: 'wortel', weightG: 80 }])
+    expect(store.petCovered).toBe(120)
+    expect(store.staples).toEqual([{ id: 's1', name: 'suiker' }])
   })
 
   it('recipeById getter resolves a recipe card by id', async () => {
@@ -265,27 +278,31 @@ describe('menu store — pet', () => {
     mocked.getShoppingList.mockResolvedValue({ items: [], pantry: [] })
   })
 
-  it('loadPet() fills target and selection', async () => {
+  it('loadPet() fills target, selection and coverage', async () => {
     mocked.getPet.mockResolvedValue({
       targetG: 1250,
       selection: [{ id: 'p1', name: 'paprika', weightG: 150 }],
+      coveredG: 200,
     })
     const store = useMenuStore()
     await store.loadPet()
     expect(store.petTarget).toBe(1250)
     expect(store.petSelection).toEqual([{ id: 'p1', name: 'paprika', weightG: 150 }])
+    expect(store.petCovered).toBe(200)
   })
 
-  it('regeneratePet() updates target + selection and refreshes the bag', async () => {
+  it('regeneratePet() updates target + selection + coverage and refreshes the bag', async () => {
     mocked.regeneratePet.mockResolvedValue({
       targetG: 1000,
       selection: [{ id: 'p2', name: 'komkommer', weightG: 400 }],
+      coveredG: 150,
     })
     const store = useMenuStore()
     await store.regeneratePet()
     expect(mocked.regeneratePet).toHaveBeenCalled()
     expect(store.petTarget).toBe(1000)
     expect(store.petSelection).toEqual([{ id: 'p2', name: 'komkommer', weightG: 400 }])
+    expect(store.petCovered).toBe(150)
     expect(mocked.getShoppingList).toHaveBeenCalled()
   })
 
@@ -340,5 +357,47 @@ describe('menu store — pet', () => {
     await store.deletePetFood('p2')
     expect(mocked.deletePetFood).toHaveBeenCalledWith('p2')
     expect(store.petFoods).toEqual([{ id: 'p1', name: 'paprika', weightG: 150 }])
+  })
+})
+
+describe('menu store — staples', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('loadStaples() fills the staples list', async () => {
+    mocked.listStaples.mockResolvedValue([
+      { id: 's1', name: 'suiker' },
+      { id: 's2', name: 'zout' },
+    ])
+    const store = useMenuStore()
+    await store.loadStaples()
+    expect(mocked.listStaples).toHaveBeenCalled()
+    expect(store.staples).toEqual([
+      { id: 's1', name: 'suiker' },
+      { id: 's2', name: 'zout' },
+    ])
+  })
+
+  it('addStaple() creates via the API then reloads the list', async () => {
+    mocked.addStaple.mockResolvedValue({ id: 's3', name: 'kaneel' })
+    mocked.listStaples.mockResolvedValue([{ id: 's3', name: 'kaneel' }])
+    const store = useMenuStore()
+    await store.addStaple('Kaneel')
+    expect(mocked.addStaple).toHaveBeenCalledWith('Kaneel')
+    expect(store.staples).toEqual([{ id: 's3', name: 'kaneel' }])
+  })
+
+  it('deleteStaple() updates the list from the API response', async () => {
+    mocked.deleteStaple.mockResolvedValue([{ id: 's1', name: 'suiker' }])
+    const store = useMenuStore()
+    store.staples = [
+      { id: 's1', name: 'suiker' },
+      { id: 's2', name: 'zout' },
+    ]
+    await store.deleteStaple('s2')
+    expect(mocked.deleteStaple).toHaveBeenCalledWith('s2')
+    expect(store.staples).toEqual([{ id: 's1', name: 'suiker' }])
   })
 })

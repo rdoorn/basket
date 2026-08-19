@@ -42,26 +42,35 @@ class PetOut(BaseModel):
     """Current pet state for ``GET /pet`` and mutation responses.
 
     ``selection`` resolves each chosen food name back to its full record so the
-    UI can show and re-roll it; unknown names are dropped.
+    UI can show and re-roll it; unknown names are dropped. ``covered_g`` is the
+    leftover coverage from recipe overlaps for the current menu.
     """
 
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     target_g: int
     selection: list[PetFoodOut]
+    covered_g: int = 0
 
     @classmethod
     def build(
-        cls, target_g: int, selection: list[str], foods: list[PetFood]
+        cls,
+        target_g: int,
+        selection: list[str],
+        foods: list[PetFood],
+        covered_g: int = 0,
     ) -> "PetOut":
-        """Build the response, resolving ``selection`` names against ``foods``."""
+        """Build the response, resolving ``selection`` names against ``foods``.
+
+        :param covered_g: leftover coverage in grams from recipe overlaps.
+        """
         by_name = {food.name: food for food in foods}
         resolved = [
             PetFoodOut.from_food(by_name[name])
             for name in selection
             if name in by_name
         ]
-        return cls(target_g=target_g, selection=resolved)
+        return cls(target_g=target_g, selection=resolved, covered_g=covered_g)
 
 
 class PetTargetIn(BaseModel):
