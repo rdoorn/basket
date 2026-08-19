@@ -27,7 +27,7 @@ class MongoMenuRepo(MenuRepo):
         return WeekMenu.model_validate(
             {
                 "assignments": doc.get("assignments", {}),
-                "promoted_staples": doc.get("promoted_staples", []),
+                "item_choices": doc.get("item_choices", {}),
             }
         )
 
@@ -36,7 +36,7 @@ class MongoMenuRepo(MenuRepo):
         dump = menu.model_dump()
         payload: dict[str, Any] = {
             "assignments": dump["assignments"],
-            "promoted_staples": dump["promoted_staples"],
+            "item_choices": dump["item_choices"],
         }
         await self._collection.replace_one(
             {"_id": _DOC_ID},

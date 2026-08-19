@@ -14,7 +14,7 @@ The result is sorted by name.
 from app.domain.menu import WeekMenu
 from app.domain.recipe import Recipe
 from app.domain.shopping import ShoppingBreakdown, ShoppingListItem
-from app.domain.staples import is_staple, normalize_staple
+from app.domain.staples import is_staple, normalize_name
 
 
 def build_shopping_list(
@@ -56,33 +56,27 @@ def build_shopping_list(
     return sorted(aggregated.values(), key=lambda item: item.name)
 
 
-def partition_staples(
+def partition_items(
     items: list[ShoppingListItem],
-    promoted_staples: list[str],
+    item_choices: dict[str, bool],
 ) -> ShoppingBreakdown:
     """Split ``items`` into a shopping list and a "heb ik vast wel" list.
 
-    A staple ingredient goes to ``pantry`` unless its name is in
-    ``promoted_staples``, in which case it joins ``items`` (to be ordered).
-    Non-staples always go to ``items``. Staple lines are flagged so the UI can
-    show a promote/un-promote control.
+    Each item's bucket is its explicit choice in ``item_choices`` when present,
+    otherwise its default: staples default to the pantry, everything else to the
+    shopping list. Items are flagged with their staple-ness for the UI.
 
     :param items: aggregated shopping-list lines.
-    :param promoted_staples: normalized names of staples the user will buy.
+    :param item_choices: normalized name -> buy? overrides.
     :returns: the split :class:`ShoppingBreakdown`.
     """
-    promoted = {normalize_staple(name) for name in promoted_staples}
     to_buy: list[ShoppingListItem] = []
     pantry: list[ShoppingListItem] = []
     for item in items:
-        if not is_staple(item.name):
-            to_buy.append(item)
-            continue
-        flagged = item.model_copy(update={"staple": True})
-        if normalize_staple(item.name) in promoted:
-            to_buy.append(flagged)
-        else:
-            pantry.append(flagged)
+        staple = is_staple(item.name)
+        buy = item_choices.get(normalize_name(item.name), not staple)
+        flagged = item.model_copy(update={"staple": staple})
+        (to_buy if buy else pantry).append(flagged)
     return ShoppingBreakdown(items=to_buy, pantry=pantry)
 
 
@@ -92,4 +86,4 @@ def build_breakdown(
 ) -> ShoppingBreakdown:
     """Build the aggregated shopping list split into to-buy and pantry lists."""
     items = build_shopping_list(menu, recipes_by_id)
-    return partition_staples(items, menu.promoted_staples)
+    return partition_items(items, menu.item_choices)

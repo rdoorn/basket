@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.deps import get_recipe_repo
 from app.api.routers import pricing, recipes, shopping, weekmenu
-from app.seed import seed_if_empty
+from app.seed import seed_missing
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     Tests override the repositories, so this is effectively a no-op there.
     """
     try:
-        await seed_if_empty(get_recipe_repo())
+        await seed_missing(get_recipe_repo())
     except Exception as exc:  # noqa: BLE001 - startup must never crash on seed
         logger.warning("Startup seed skipped: %s", exc)
     yield

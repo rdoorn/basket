@@ -58,11 +58,11 @@ function onSave(): void {
 }
 
 function onPromote(name: string): void {
-  store.setStaple(name, true).catch((err) => showToast(`Toevoegen mislukt: ${String(err)}`))
+  store.setItemBuy(name, true).catch((err) => showToast(`Toevoegen mislukt: ${String(err)}`))
 }
 
-function onUnpromote(name: string): void {
-  store.setStaple(name, false).catch((err) => showToast(`Terugzetten mislukt: ${String(err)}`))
+function onDemote(name: string): void {
+  store.setItemBuy(name, false).catch((err) => showToast(`Verplaatsen mislukt: ${String(err)}`))
 }
 </script>
 
@@ -103,7 +103,7 @@ function onUnpromote(name: string): void {
       </section>
 
       <div class="side">
-        <ShoppingList :items="store.shoppingList" @unpromote="onUnpromote" />
+        <ShoppingList :items="store.shoppingList" @demote="onDemote" />
         <PantryList :items="store.pantry" @promote="onPromote" />
       </div>
     </div>

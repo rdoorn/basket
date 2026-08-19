@@ -126,14 +126,15 @@ async def test_menu_save_and_load_round_trip():
 
 
 @pytest.mark.asyncio
-async def test_menu_round_trips_promoted_staples():
+async def test_menu_round_trips_item_choices():
     repo = MongoMenuRepo(_db())
     menu = WeekMenu()
     menu.set("2026-08-17", DayAssignment(recipe_id="r1", multiplier=1.0))
-    menu.set_staple_buy("gehakt", True)
+    menu.set_item_buy("gehakt", True)
+    menu.set_item_buy("rode paprika", False)
     await repo.save(menu)
     loaded = await repo.load()
-    assert loaded.promoted_staples == ["gehakt"]
+    assert loaded.item_choices == {"gehakt": True, "rode paprika": False}
 
 
 @pytest.mark.asyncio

@@ -1,13 +1,14 @@
 """Shopping-list endpoints.
 
 Loads the current menu and all recipes, then delegates aggregation, scaling and
-the staple split to ``shopping_service``. The staple endpoint promotes or
-un-promotes a "heb ik vast wel" ingredient and persists the choice on the menu.
+the pantry split to ``shopping_service``. The item endpoint moves an ingredient
+between the shopping list and the "heb ik vast wel" list and persists the choice
+on the menu.
 """
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_menu_repo, get_recipe_repo
-from app.api.schemas.shopping import ShoppingListOut, StapleToggleIn
+from app.api.schemas.shopping import ItemBuyIn, ShoppingListOut
 from app.ports.menu_repo import MenuRepo
 from app.ports.recipe_repo import RecipeRepo
 from app.services import shopping_service
@@ -33,14 +34,14 @@ async def get_shopping_list(
     return await _breakdown(menu_repo, recipe_repo)
 
 
-@router.put("/staple", response_model=ShoppingListOut)
-async def set_staple(
-    body: StapleToggleIn,
+@router.put("/item", response_model=ShoppingListOut)
+async def set_item_buy(
+    body: ItemBuyIn,
     menu_repo: MenuRepo = Depends(get_menu_repo),
     recipe_repo: RecipeRepo = Depends(get_recipe_repo),
 ) -> ShoppingListOut:
-    """Promote or un-promote a staple and return the updated breakdown."""
+    """Move an ingredient between the two lists and return the updated split."""
     menu = await menu_repo.load()
-    menu.set_staple_buy(body.name, body.buy)
+    menu.set_item_buy(body.name, body.buy)
     await menu_repo.save(menu)
     return await _breakdown(menu_repo, recipe_repo)

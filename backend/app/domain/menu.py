@@ -6,7 +6,7 @@ resolution lives in ``app.services.menu_service``.
 """
 from pydantic import BaseModel, Field
 
-from app.domain.staples import normalize_staple
+from app.domain.staples import normalize_name
 
 
 class DayAssignment(BaseModel):
@@ -19,13 +19,15 @@ class DayAssignment(BaseModel):
 class WeekMenu(BaseModel):
     """A collection of per-date assignments keyed by ISO date string.
 
-    ``promoted_staples`` holds the normalized names of staple ingredients the
-    user has chosen to actually buy (moved from the "heb ik vast wel" list into
-    the shopping list). It persists with the menu.
+    ``item_choices`` maps a normalized ingredient name to an explicit bucket
+    choice: ``True`` = put it on the shopping list, ``False`` = keep it in the
+    "heb ik vast wel" list. Absent items fall back to their default (staples
+    default to the pantry, everything else to the shopping list). Persists with
+    the menu.
     """
 
     assignments: dict[str, DayAssignment] = Field(default_factory=dict)
-    promoted_staples: list[str] = Field(default_factory=list)
+    item_choices: dict[str, bool] = Field(default_factory=dict)
 
     def get(self, date: str) -> DayAssignment | None:
         """Return the assignment for ``date`` or ``None`` when empty."""
@@ -39,14 +41,7 @@ class WeekMenu(BaseModel):
         """Clear ``date`` if present; a no-op when the day is already empty."""
         self.assignments.pop(date, None)
 
-    def set_staple_buy(self, name: str, buy: bool) -> None:
-        """Promote (``buy=True``) or un-promote a staple, keyed by name.
-
-        Idempotent: promoting an already-promoted staple, or un-promoting one
-        that is not promoted, is a no-op.
-        """
-        key = normalize_staple(name)
-        if buy and key not in self.promoted_staples:
-            self.promoted_staples.append(key)
-        elif not buy and key in self.promoted_staples:
-            self.promoted_staples.remove(key)
+    def set_item_buy(self, name: str, buy: bool) -> None:
+        """Record whether ``name`` goes on the shopping list (``buy=True``) or
+        the "heb ik vast wel" list (``buy=False``). Idempotent."""
+        self.item_choices[normalize_name(name)] = buy

@@ -15,7 +15,7 @@ from app.adapters.db.mongo_menu_repo import MongoMenuRepo
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
 from app.api.deps import get_menu_repo, get_recipe_repo
 from app.main import app
-from app.seed import seed_if_empty
+from app.seed import seed_missing
 
 
 @pytest_asyncio.fixture
@@ -24,7 +24,7 @@ async def client():
     db = AsyncMongoMockClient()["basket_test"]
     recipe_repo = MongoRecipeRepo(db)
     menu_repo = MongoMenuRepo(db)
-    await seed_if_empty(recipe_repo)
+    await seed_missing(recipe_repo)
 
     app.dependency_overrides[get_recipe_repo] = lambda: recipe_repo
     app.dependency_overrides[get_menu_repo] = lambda: menu_repo
@@ -49,11 +49,11 @@ async def test_list_recipes_returns_seed_card(client):
     resp = await client.get("/recipes")
     assert resp.status_code == 200
     cards = resp.json()
-    assert len(cards) == 1
-    card = cards[0]
-    assert card["id"] == "macaroni-alla-siciliana"
-    assert card["icon"] == "🍝"
-    assert "Siciliana" in card["title"]
+    assert len(cards) == 4
+    by_id = {c["id"]: c for c in cards}
+    assert "macaroni-alla-siciliana" in by_id
+    assert "spaghetti-bolognese" in by_id
+    assert by_id["macaroni-alla-siciliana"]["icon"] == "🍝"
 
 
 @pytest.mark.asyncio
@@ -236,7 +236,7 @@ async def test_promote_and_unpromote_staple(client):
     )
     # Promote gehakt into the shopping list.
     promoted = await client.put(
-        "/shopping-list/staple", json={"name": "gehakt", "buy": True}
+        "/shopping-list/item", json={"name": "gehakt", "buy": True}
     )
     assert promoted.status_code == 200
     body = promoted.json()
@@ -254,8 +254,32 @@ async def test_promote_and_unpromote_staple(client):
     after_get = (await client.get("/shopping-list")).json()
     assert any(i["name"] == "gehakt" for i in after_get["items"])
     reverted = await client.put(
-        "/shopping-list/staple", json={"name": "gehakt", "buy": False}
+        "/shopping-list/item", json={"name": "gehakt", "buy": False}
     )
     body2 = reverted.json()
     assert any(i["name"] == "gehakt" for i in body2["pantry"])
     assert all(i["name"] != "gehakt" for i in body2["items"])
+
+
+@pytest.mark.asyncio
+async def test_non_staple_can_be_moved_to_pantry_and_back(client):
+    rid = "macaroni-alla-siciliana"
+    await client.put(
+        "/weekmenu/assignments",
+        json={"date": _today(), "recipeId": rid, "multiplier": 1.0},
+    )
+    # Move a normal shopping item (rode paprika) to "heb ik vast wel".
+    moved = await client.put(
+        "/shopping-list/item", json={"name": "rode paprika", "buy": False}
+    )
+    body = moved.json()
+    assert any(i["name"] == "rode paprika" for i in body["pantry"])
+    assert all(i["name"] != "rode paprika" for i in body["items"])
+
+    # And back to the shopping list.
+    back = await client.put(
+        "/shopping-list/item", json={"name": "rode paprika", "buy": True}
+    )
+    body2 = back.json()
+    assert any(i["name"] == "rode paprika" for i in body2["items"])
+    assert all(i["name"] != "rode paprika" for i in body2["pantry"])

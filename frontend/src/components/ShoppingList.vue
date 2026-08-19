@@ -3,7 +3,7 @@ import type { ShoppingItem } from '../api/client'
 
 defineProps<{ items: ShoppingItem[] }>()
 
-const emit = defineEmits<{ (e: 'unpromote', name: string): void }>()
+const emit = defineEmits<{ (e: 'demote', name: string): void }>()
 
 function formatQty(item: ShoppingItem): string {
   if (item.quantity === null) {
@@ -22,18 +22,15 @@ function formatQty(item: ShoppingItem): string {
     <p v-if="items.length === 0" class="empty">Nog geen recepten ingepland.</p>
     <ul v-else>
       <li v-for="item in items" :key="`${item.name}-${item.unit}`">
-        <span class="name">
-          {{ item.name }}
-          <button
-            v-if="item.staple"
-            class="unpromote"
-            type="button"
-            title="Terug naar 'heb ik vast wel'"
-            @click="emit('unpromote', item.name)"
-          >
-            −
-          </button>
-        </span>
+        <button
+          class="demote"
+          type="button"
+          title="Verplaats naar 'heb ik vast wel'"
+          @click="emit('demote', item.name)"
+        >
+          −
+        </button>
+        <span class="name">{{ item.name }}</span>
         <span class="qty">{{ formatQty(item) }}</span>
       </li>
     </ul>
@@ -66,11 +63,15 @@ ul {
 
 li {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.88rem;
+}
+
+.name {
+  flex: 1;
 }
 
 .qty {
@@ -78,11 +79,9 @@ li {
   white-space: nowrap;
 }
 
-.unpromote {
-  padding: 0 0.35rem;
-  margin-left: 0.3rem;
-  font-size: 0.8rem;
+.demote {
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
   line-height: 1.3;
-  color: var(--muted);
 }
 </style>

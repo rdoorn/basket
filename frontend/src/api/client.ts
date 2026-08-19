@@ -190,9 +190,10 @@ export function getShoppingList(): Promise<ShoppingListResponse> {
   return request<ShoppingListResponse>('/shopping-list')
 }
 
-// Promote (buy=true) or un-promote a "heb ik vast wel" staple.
-export function setStaple(name: string, buy: boolean): Promise<ShoppingListResponse> {
-  return request<ShoppingListResponse>('/shopping-list/staple', {
+// Move an ingredient between the shopping list (buy=true) and the
+// "heb ik vast wel" list (buy=false). Works for any ingredient.
+export function setItemBuy(name: string, buy: boolean): Promise<ShoppingListResponse> {
+  return request<ShoppingListResponse>('/shopping-list/item', {
     method: 'PUT',
     body: JSON.stringify({ name, buy }),
   })
@@ -212,7 +213,7 @@ export const api = {
   putAssignment,
   deleteAssignment,
   getShoppingList,
-  setStaple,
+  setItemBuy,
   quotePricing,
 }
 

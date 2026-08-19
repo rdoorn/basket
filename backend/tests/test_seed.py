@@ -3,7 +3,14 @@ import pytest
 from mongomock_motor import AsyncMongoMockClient
 
 from app.adapters.db.mongo_recipe_repo import MongoRecipeRepo
-from app.seed import build_seed_recipe, seed_if_empty
+from app.seed import (
+    build_salade_garnalen,
+    build_salade_kip_pesto,
+    build_seed_recipe,
+    build_spaghetti_bolognese,
+    seed_missing,
+    seed_recipes,
+)
 
 
 def _ingredients_by_name(recipe):
@@ -51,12 +58,52 @@ def test_seed_recipe_has_expected_groups():
     assert {"Pasta", "Basis", "Tomatenbasis", "Kruiden", "Frisse afwerking"} <= groups
 
 
+def test_all_seed_recipes_are_valid_and_uniquely_ided():
+    recipes = seed_recipes()
+    assert len(recipes) == 4
+    ids = [r.id for r in recipes]
+    assert len(set(ids)) == 4  # no duplicate ids
+    for recipe in recipes:
+        assert recipe.title
+        assert recipe.icon
+        assert recipe.servings >= 1
+        assert recipe.steps  # every recipe has steps
+        assert recipe.ingredients
+
+
+def test_new_recipe_builders_core_facts():
+    bolo = build_spaghetti_bolognese()
+    assert bolo.id == "spaghetti-bolognese"
+    assert bolo.servings == 2
+    by_name = {i.name: i for i in bolo.ingredients}
+    assert by_name["rundergehakt"].quantity == 200
+    assert by_name["spaghetti"].quantity == 200
+
+    garnalen = build_salade_garnalen()
+    assert garnalen.id == "salade-garnalen"
+    assert garnalen.icon == "🦐"
+
+    kip = build_salade_kip_pesto()
+    assert kip.id == "salade-kip-pesto"
+    assert any(i.name == "pesto" for i in kip.ingredients)
+
+
 @pytest.mark.asyncio
-async def test_seed_if_empty_inserts_once_and_is_idempotent():
+async def test_seed_missing_inserts_all_and_is_idempotent():
     db = AsyncMongoMockClient()["basket_test"]
     repo = MongoRecipeRepo(db)
     assert await repo.count() == 0
-    await seed_if_empty(repo)
+    await seed_missing(repo)
+    assert await repo.count() == 4
+    await seed_missing(repo)  # idempotent — no duplicates
+    assert await repo.count() == 4
+
+
+@pytest.mark.asyncio
+async def test_seed_missing_adds_only_new_recipes():
+    db = AsyncMongoMockClient()["basket_test"]
+    repo = MongoRecipeRepo(db)
+    await repo.create(build_seed_recipe())  # macaroni already present
     assert await repo.count() == 1
-    await seed_if_empty(repo)
-    assert await repo.count() == 1
+    await seed_missing(repo)
+    assert await repo.count() == 4  # the three new ones got added

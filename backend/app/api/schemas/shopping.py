@@ -20,11 +20,11 @@ class ShoppingListOut(BaseModel):
         return cls(items=breakdown.items, pantry=breakdown.pantry)
 
 
-class StapleToggleIn(BaseModel):
-    """Request body for promoting/un-promoting a staple.
+class ItemBuyIn(BaseModel):
+    """Request body for moving an ingredient between the two lists.
 
-    ``buy=True`` moves the staple from "heb ik vast wel" into the shopping list;
-    ``buy=False`` moves it back.
+    ``buy=True`` puts it on the shopping list; ``buy=False`` moves it to the
+    "heb ik vast wel" list. Works for any ingredient, not just staples.
     """
 
     name: str

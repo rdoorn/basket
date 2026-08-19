@@ -14,13 +14,17 @@ def test_is_staple_excludes_non_staples_and_citroenrasp():
     assert not is_staple("citroenrasp")  # only citroensap is a staple
 
 
-def test_set_staple_buy_promote_and_unpromote_idempotent():
+def test_set_item_buy_records_normalized_choice_idempotently():
     menu = WeekMenu()
-    menu.set_staple_buy("Gehakt", True)
-    assert menu.promoted_staples == ["gehakt"]
-    menu.set_staple_buy("gehakt", True)  # idempotent
-    assert menu.promoted_staples == ["gehakt"]
-    menu.set_staple_buy("gehakt", False)
-    assert menu.promoted_staples == []
-    menu.set_staple_buy("gehakt", False)  # idempotent
-    assert menu.promoted_staples == []
+    menu.set_item_buy("Gehakt", True)
+    assert menu.item_choices == {"gehakt": True}
+    menu.set_item_buy("gehakt", True)  # idempotent
+    assert menu.item_choices == {"gehakt": True}
+    menu.set_item_buy("gehakt", False)
+    assert menu.item_choices == {"gehakt": False}
+
+
+def test_set_item_buy_works_for_non_staples():
+    menu = WeekMenu()
+    menu.set_item_buy("rode paprika", False)
+    assert menu.item_choices == {"rode paprika": False}

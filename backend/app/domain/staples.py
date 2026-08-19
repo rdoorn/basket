@@ -12,6 +12,7 @@ STAPLE_INGREDIENTS: frozenset[str] = frozenset(
         "citroensap",
         "chilivlokken",
         "gehakt",
+        "rundergehakt",
         "zout",
         "zwarte peper",
         "venkelzaad",
@@ -19,11 +20,15 @@ STAPLE_INGREDIENTS: frozenset[str] = frozenset(
 )
 
 
-def normalize_staple(name: str) -> str:
+def normalize_name(name: str) -> str:
     """Return the canonical (trimmed, lower-cased) form used for matching."""
     return name.strip().lower()
 
 
 def is_staple(name: str) -> bool:
-    """Return whether ``name`` is a staple ("heb ik vast wel") ingredient."""
-    return normalize_staple(name) in STAPLE_INGREDIENTS
+    """Return whether ``name`` is a staple ("heb ik vast wel") ingredient.
+
+    Staple-ness only sets an ingredient's *default* bucket (staples default to
+    the pantry list); the user can override any item's placement.
+    """
+    return normalize_name(name) in STAPLE_INGREDIENTS

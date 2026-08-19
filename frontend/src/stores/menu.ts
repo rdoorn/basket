@@ -5,7 +5,7 @@ import {
   getShoppingList,
   putAssignment,
   deleteAssignment,
-  setStaple,
+  setItemBuy,
   type Assignment,
   type RecipeCard,
   type ShoppingItem,
@@ -132,9 +132,10 @@ export const useMenuStore = defineStore('menu', {
       this.pantry = res.pantry ?? []
     },
 
-    // Promote (buy=true) or un-promote a "heb ik vast wel" staple.
-    async setStaple(name: string, buy: boolean): Promise<void> {
-      const res = await setStaple(name, buy)
+    // Move an ingredient between the shopping list (buy=true) and the
+    // "heb ik vast wel" list (buy=false).
+    async setItemBuy(name: string, buy: boolean): Promise<void> {
+      const res = await setItemBuy(name, buy)
       this.shoppingList = res.items
       this.pantry = res.pantry ?? []
     },
